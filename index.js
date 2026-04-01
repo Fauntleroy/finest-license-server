@@ -472,7 +472,7 @@ app.post('/whop-webhook', (req, res) => {
   console.log('[Whop] Event received | action:', event.action, '| email:', event.data?.email, '| user_id:', event.data?.user_id);
 
   // New paid member — issue key
-  if (event.action === 'membership.went_valid') {
+  if (event.action === 'membership_activated') {
     const keys    = loadKeys();
     const newKey  = generateKey();
     const email   = event.data?.email   || 'unknown';
@@ -494,7 +494,7 @@ app.post('/whop-webhook', (req, res) => {
   }
 
   // Membership cancelled / payment failed — revoke key
-  if (event.action === 'membership.went_invalid') {
+  if (event.action === 'membership_deactivated') {
     const userId = event.data?.user_id || event.data?.id;
     if (userId) {
       const keys = loadKeys();
