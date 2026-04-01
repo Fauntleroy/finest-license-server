@@ -458,39 +458,12 @@ app.post('/whop-webhook', (req, res) => {
     }
 
     const signedContent = `${msgId}.${timestamp}.${req.rawBody || ''}`;
-
-    // Debug — logged once per webhook so we can diagnose key-decoding issues
-    console.log('[Whop] sig-debug | msgId:', msgId, '| timestamp:', timestamp,
-                '| rawBody len:', (req.rawBody || '').length,
-                '| rawBody preview:', (req.rawBody || '').slice(0, 80),
-                '| sigHeader:', sigHeader);
-
-    // Try every plausible decoding of the Whop/Svix secret
-    const candidates = [];
-    if (secret.startsWith('whsec_')) {
-      candidates.push({ label: 'whsec_base64', bytes: Buffer.from(secret.slice(6), 'base64') });
-    } else if (secret.startsWith('ws_')) {
-      const stripped = secret.slice(3);
-      candidates.push({ label: 'ws_hex',   bytes: Buffer.from(stripped, 'hex') });
-      candidates.push({ label: 'ws_utf8',  bytes: Buffer.from(stripped) });
-      candidates.push({ label: 'full_utf8',bytes: Buffer.from(secret) });
-    } else {
-      candidates.push({ label: 'raw_utf8', bytes: Buffer.from(secret) });
-    }
-
-    let valid = false;
-    for (const { label, bytes } of candidates) {
-      const computed = crypto.createHmac('sha256', bytes).update(signedContent).digest('base64');
-      console.log(`[Whop] sig-debug | strategy=${label} | computed=v1,${computed}`);
-      if (sigHeader.split(' ').some(s => s === `v1,${computed}`)) {
-        console.log(`[Whop] Signature MATCHED with strategy: ${label}`);
-        valid = true;
-        break;
-      }
-    }
+    // Whop/Svix signs with the full secret string as UTF-8 bytes (including any prefix)
+    const computed = crypto.createHmac('sha256', Buffer.from(secret)).update(signedContent).digest('base64');
+    const valid    = sigHeader.split(' ').some(s => s === `v1,${computed}`);
 
     if (!valid) {
-      console.warn('[Whop] Signature invalid — none of the strategies matched');
+      console.warn('[Whop] Signature invalid');
       return res.status(401).json({ error: 'Invalid signature' });
     }
   }
