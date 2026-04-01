@@ -458,9 +458,9 @@ app.post('/whop-webhook', (req, res) => {
     }
 
     const signedContent = `${msgId}.${timestamp}.${req.rawBody || ''}`;
-    const secretBytes   = secret.startsWith('whsec_')
-      ? Buffer.from(secret.slice(6), 'base64')
-      : Buffer.from(secret);
+    const secretBytes   = secret.startsWith('whsec_') ? Buffer.from(secret.slice(6), 'base64')
+                        : secret.startsWith('ws_')    ? Buffer.from(secret.slice(3), 'hex')
+                        : Buffer.from(secret);
     const computed = crypto.createHmac('sha256', secretBytes).update(signedContent).digest('base64');
 
     // sigHeader can contain multiple space-separated "v1,<base64>" signatures
