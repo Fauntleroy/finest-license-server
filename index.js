@@ -16,7 +16,9 @@ const DISCORD_CLIENT_ID     = process.env.DISCORD_CLIENT_ID     || '148870693099
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || 'Mxf2vBKG9yFF9FOGvMTLyhuqES6p12NM';
 const DISCORD_BOT_TOKEN     = process.env.DISCORD_BOT_TOKEN?.replace(/\s+/g, '') || null;
 const DISCORD_SERVER_ID     = process.env.DISCORD_SERVER_ID    || '756211694547501117';
-const EXTENSION_DOWNLOAD_URL= process.env.EXTENSION_DOWNLOAD_URL || ''; // set in Railway to your zip URL
+const EXTENSION_DOWNLOAD_URL= process.env.EXTENSION_DOWNLOAD_URL || '';
+const RESEND_API_KEY        = process.env.RESEND_API_KEY         || '';
+const FROM_EMAIL            = process.env.FROM_EMAIL             || 'Finest Checkouts <onboarding@resend.dev>';
 
 // Roles that grant access (role names, lowercase — edit via DISCORD_QUALIFYING_ROLES env var)
 const QUALIFYING_ROLES = (process.env.DISCORD_QUALIFYING_ROLES || 'YouTube Member: Brick Boy Squad,YouTube Member: Cook God,Server Booster,Grandfathered')
@@ -122,6 +124,46 @@ async function exchangeDiscordCode(code) {
     throw new Error(`Discord token exchange failed: ${txt}`);
   }
   return res.json();
+}
+
+// ── Email via Resend ──────────────────────────────────────────────────────────
+async function sendKeyEmail(toEmail, key) {
+  if (!RESEND_API_KEY) { console.warn('[Email] RESEND_API_KEY not set — skipping'); return; }
+
+  const downloadSection = EXTENSION_DOWNLOAD_URL
+    ? `<p style="margin:16px 0"><a href="${EXTENSION_DOWNLOAD_URL}" style="background:#c9a84c;color:#080808;padding:12px 24px;border-radius:5px;text-decoration:none;font-weight:700;font-family:monospace">Download Extension</a></p>
+       <p style="color:#888;font-size:13px;margin-top:8px">After downloading: unzip → open chrome://extensions → enable Developer Mode → Load unpacked → select the folder → enter your key in the popup.</p>`
+    : `<p style="color:#888;font-size:13px">Download link coming soon — your key is ready to use once you have the extension.</p>`;
+
+  const html = `
+    <div style="background:#080808;padding:40px 32px;max-width:480px;margin:0 auto;font-family:monospace">
+      <div style="color:#c9a84c;font-size:20px;font-weight:700;letter-spacing:0.1em;margin-bottom:8px">FINEST CHECKOUTS</div>
+      <div style="color:#6a6050;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:28px">License Key</div>
+      <p style="color:#f0e6c8;font-size:14px;margin-bottom:20px">Thanks for subscribing! Here's your license key:</p>
+      <div style="background:#181818;border:1px solid #7a5e1e;border-radius:6px;padding:16px 20px;margin-bottom:20px">
+        <span style="color:#c9a84c;font-size:18px;letter-spacing:0.12em">${key}</span>
+      </div>
+      <p style="color:#f0e6c8;font-size:13px;margin-bottom:16px">Enter this key in the extension popup to activate.</p>
+      ${downloadSection}
+      <hr style="border:none;border-top:1px solid #252525;margin:28px 0"/>
+      <p style="color:#3a3530;font-size:11px">Questions? Reply to this email.<br/>Finest Tools — Only the finest.</p>
+    </div>`;
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method:  'POST',
+      headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: FROM_EMAIL, to: [toEmail], subject: 'Your Finest Checkouts License Key', html }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      console.error('[Email] Resend error:', err);
+    } else {
+      console.log(`[Email] Key sent to ${toEmail}`);
+    }
+  } catch (err) {
+    console.error('[Email] Failed to send:', err.message);
+  }
 }
 
 // ── Portal HTML ───────────────────────────────────────────────────────────────
@@ -414,6 +456,7 @@ app.post('/whop-webhook', (req, res) => {
     };
     saveKeys(keys);
     console.log(`[Whop] Key issued for ${email}: ${newKey}`);
+    if (email && email !== 'unknown') sendKeyEmail(email, newKey);
     return res.json({ received: true, key: newKey });
   }
 
