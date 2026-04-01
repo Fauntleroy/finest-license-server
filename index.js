@@ -19,7 +19,7 @@ const DISCORD_SERVER_ID     = process.env.DISCORD_SERVER_ID    || '7562116945475
 const EXTENSION_DOWNLOAD_URL= process.env.EXTENSION_DOWNLOAD_URL || ''; // set in Railway to your zip URL
 
 // Roles that grant access (role names, lowercase — edit via DISCORD_QUALIFYING_ROLES env var)
-const QUALIFYING_ROLES = (process.env.DISCORD_QUALIFYING_ROLES || 'YouTube Member: Brick Boy Squad,YouTube Member: Cook God,Server Booster')
+const QUALIFYING_ROLES = (process.env.DISCORD_QUALIFYING_ROLES || 'YouTube Member: Brick Boy Squad,YouTube Member: Cook God,Server Booster,Grandfathered')
   .split(',').map(r => r.trim().toLowerCase());
 
 // ── Key store (file-based — swap for DB if you scale) ─────────────────────────
