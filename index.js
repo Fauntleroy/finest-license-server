@@ -469,14 +469,14 @@ app.post('/whop-webhook', (req, res) => {
   }
 
   const event = req.body;
-  console.log('[Whop] Raw payload:', JSON.stringify(event));
+  console.log('[Whop] Event type:', event.type, '| email:', event.data?.user?.email, '| user_id:', event.data?.user?.id);
 
   // New paid member — issue key
-  if (event.action === 'membership_activated') {
+  if (event.type === 'membership.activated') {
     const keys    = loadKeys();
     const newKey  = generateKey();
-    const email   = event.data?.email   || 'unknown';
-    const userId  = event.data?.user_id || event.data?.id || 'unknown';
+    const email   = event.data?.user?.email || 'unknown';
+    const userId  = event.data?.user?.id    || event.data?.id || 'unknown';
 
     keys[newKey] = {
       status:    'active',
@@ -494,8 +494,8 @@ app.post('/whop-webhook', (req, res) => {
   }
 
   // Membership cancelled / payment failed — revoke key
-  if (event.action === 'membership_deactivated') {
-    const userId = event.data?.user_id || event.data?.id;
+  if (event.type === 'membership.deactivated') {
+    const userId = event.data?.user?.id || event.data?.id;
     if (userId) {
       const keys = loadKeys();
       let changed = false;
