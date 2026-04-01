@@ -445,16 +445,29 @@ app.post('/validate', (req, res) => {
 app.post('/whop-webhook', (req, res) => {
   const secret = process.env.WHOP_WEBHOOK_SECRET;
   if (secret) {
-    const sig = req.headers['x-whop-signature'] || req.headers['whop-signature'] || '';
-    console.log('[Whop] Headers received:', JSON.stringify(req.headers));
-    if (sig) {
-      const expected = crypto.createHmac('sha256', secret).update(req.rawBody || '').digest('hex');
-      if (sig !== expected) {
-        console.warn('[Whop] Signature mismatch — sig:', sig, 'expected:', expected);
-        return res.status(401).json({ error: 'Invalid signature' });
-      }
-    } else {
-      console.warn('[Whop] No signature header — processing anyway (test event?)');
+    // Whop uses Svix for webhook delivery
+    // Signed content = "{webhook-id}.{webhook-timestamp}.{rawBody}"
+    // Secret may be base64-encoded with "whsec_" prefix
+    const msgId     = req.headers['webhook-id']        || '';
+    const timestamp = req.headers['webhook-timestamp'] || '';
+    const sigHeader = req.headers['webhook-signature'] || '';
+
+    if (!sigHeader) {
+      console.warn('[Whop] No webhook-signature header — rejecting');
+      return res.status(401).json({ error: 'Missing signature' });
+    }
+
+    const signedContent = `${msgId}.${timestamp}.${req.rawBody || ''}`;
+    const secretBytes   = secret.startsWith('whsec_')
+      ? Buffer.from(secret.slice(6), 'base64')
+      : Buffer.from(secret);
+    const computed = crypto.createHmac('sha256', secretBytes).update(signedContent).digest('base64');
+
+    // sigHeader can contain multiple space-separated "v1,<base64>" signatures
+    const valid = sigHeader.split(' ').some(s => s === `v1,${computed}`);
+    if (!valid) {
+      console.warn('[Whop] Signature invalid');
+      return res.status(401).json({ error: 'Invalid signature' });
     }
   }
 
