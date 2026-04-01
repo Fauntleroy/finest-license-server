@@ -469,7 +469,7 @@ app.post('/whop-webhook', (req, res) => {
   }
 
   const event = req.body;
-  console.log('[Whop] Event received | action:', event.action, '| email:', event.data?.email, '| user_id:', event.data?.user_id);
+  console.log('[Whop] Raw payload:', JSON.stringify(event));
 
   // New paid member — issue key
   if (event.action === 'membership_activated') {
