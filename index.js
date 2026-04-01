@@ -319,7 +319,21 @@ function copyKey() {
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors());
-app.use(express.json());
+
+// Capture raw body for Whop webhook signature verification before JSON parsing
+app.use((req, res, next) => {
+  if (req.path === '/whop-webhook') {
+    let raw = '';
+    req.on('data', chunk => raw += chunk);
+    req.on('end', () => {
+      req.rawBody = raw;
+      try { req.body = JSON.parse(raw); } catch { req.body = {}; }
+      next();
+    });
+  } else {
+    express.json()(req, res, next);
+  }
+});
 
 // ── Verification Portal ───────────────────────────────────────────────────────
 app.get('/', (req, res) => {
@@ -432,8 +446,11 @@ app.post('/whop-webhook', (req, res) => {
   const secret = process.env.WHOP_WEBHOOK_SECRET;
   if (secret) {
     const sig      = req.headers['x-whop-signature'] || '';
-    const expected = crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('hex');
-    if (sig !== expected) return res.status(401).json({ error: 'Invalid signature' });
+    const expected = crypto.createHmac('sha256', secret).update(req.rawBody || '').digest('hex');
+    if (sig !== expected) {
+      console.warn('[Whop] Signature mismatch — sig:', sig, 'expected:', expected);
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
   }
 
   const event = req.body;
