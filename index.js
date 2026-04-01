@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 3000;
 const SERVER_URL            = (process.env.SERVER_URL || 'https://finest-license-server-production.up.railway.app').replace(/\/$/, '');
 const DISCORD_CLIENT_ID     = process.env.DISCORD_CLIENT_ID     || '1488706930993008872';
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || 'Mxf2vBKG9yFF9FOGvMTLyhuqES6p12NM';
-const DISCORD_BOT_TOKEN     = process.env.DISCORD_BOT_TOKEN;   // set in Railway after enabling bot
+const DISCORD_BOT_TOKEN     = process.env.DISCORD_BOT_TOKEN?.replace(/\s+/g, '') || null;
 const DISCORD_SERVER_ID     = process.env.DISCORD_SERVER_ID    || '756211694547501117';
 const EXTENSION_DOWNLOAD_URL= process.env.EXTENSION_DOWNLOAD_URL || ''; // set in Railway to your zip URL
 
