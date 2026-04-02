@@ -25,7 +25,7 @@ const QUALIFYING_ROLES = (process.env.DISCORD_QUALIFYING_ROLES || 'YouTube Membe
   .split(',').map(r => r.trim().toLowerCase());
 
 // ── Key store (file-based — swap for DB if you scale) ─────────────────────────
-const KEYS_FILE = path.join(__dirname, 'keys.json');
+const KEYS_FILE = process.env.KEYS_FILE || path.join(__dirname, 'keys.json');
 
 function loadKeys() {
   if (!fs.existsSync(KEYS_FILE)) fs.writeFileSync(KEYS_FILE, '{}');
