@@ -565,6 +565,16 @@ app.get('/admin/keys', (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// GET /version
+// ─────────────────────────────────────────────
+app.get('/version', (req, res) => {
+  res.json({
+    version:     process.env.CURRENT_VERSION || '2.0.0',
+    downloadUrl: EXTENSION_DOWNLOAD_URL || null,
+  });
+});
+
+// ─────────────────────────────────────────────
 // GET /health
 // ─────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
