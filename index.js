@@ -585,6 +585,28 @@ app.get('/admin/keys', (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// POST /admin/assign-roles
+// Assigns Checkout Goat role to all active Discord keys
+// ─────────────────────────────────────────────
+app.post('/admin/assign-roles', async (req, res) => {
+  if (req.body.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
+  const keys = loadKeys();
+  let assigned = 0, skipped = 0, failed = 0;
+  for (const [key, record] of Object.entries(keys)) {
+    if (record.status !== 'active' || !record.discordUserId) { skipped++; continue; }
+    try {
+      await assignMemberRole(record.discordUserId);
+      assigned++;
+      await new Promise(r => setTimeout(r, 300)); // avoid rate limits
+    } catch {
+      failed++;
+    }
+  }
+  console.log(`[Admin] assign-roles: ${assigned} assigned, ${skipped} skipped, ${failed} failed`);
+  return res.json({ assigned, skipped, failed });
+});
+
+// ─────────────────────────────────────────────
 // GET /version
 // ─────────────────────────────────────────────
 app.get('/version', (req, res) => {
