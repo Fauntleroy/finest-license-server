@@ -585,6 +585,167 @@ app.get('/admin/keys', (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// POST /admin/delete
+// ─────────────────────────────────────────────
+app.post('/admin/delete', (req, res) => {
+  const { secret, key } = req.body;
+  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
+  const keys = loadKeys();
+  if (!keys[key?.toUpperCase()]) return res.json({ error: 'Key not found' });
+  delete keys[key.toUpperCase()];
+  saveKeys(keys);
+  console.log(`[Admin] Deleted key ${key.toUpperCase()}`);
+  return res.json({ deleted: true });
+});
+
+// ─────────────────────────────────────────────
+// GET /admin
+// ─────────────────────────────────────────────
+app.get('/admin', (req, res) => {
+  const secret = req.query.secret;
+  if (secret !== process.env.ADMIN_SECRET) {
+    return res.send(`<!DOCTYPE html><html><head><title>Admin Login</title>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0;}
+      body{background:#080808;color:#f0e6c8;font-family:monospace;display:flex;align-items:center;justify-content:center;min-height:100vh;}
+      form{background:#101010;border:1px solid #252525;border-radius:8px;padding:32px;width:320px;display:flex;flex-direction:column;gap:14px;}
+      h2{color:#c9a84c;font-size:14px;letter-spacing:0.1em;}
+      input{background:#181818;border:1px solid #252525;border-radius:5px;color:#f0e6c8;font-family:monospace;font-size:13px;padding:10px 12px;width:100%;outline:none;}
+      input:focus{border-color:#7a5e1e;}
+      button{background:#c9a84c;border:none;border-radius:5px;color:#080808;font-family:monospace;font-size:13px;font-weight:700;padding:11px;cursor:pointer;}
+      button:hover{background:#e4be6a;}
+    </style></head><body>
+    <form method="GET" action="/admin">
+      <h2>FINEST ADMIN</h2>
+      <input type="password" name="secret" placeholder="Admin secret" required autofocus/>
+      <button type="submit">Login</button>
+    </form></body></html>`);
+  }
+
+  const keys = loadKeys();
+  const active   = Object.entries(keys).filter(([,r]) => r.status === 'active');
+  const inactive = Object.entries(keys).filter(([,r]) => r.status !== 'active');
+
+  function row(key, record, isActive) {
+    const source = record.source || '—';
+    const email  = record.email || record.discordTag || '—';
+    const date   = record.createdAt ? new Date(record.createdAt).toLocaleDateString() : '—';
+    const revoked = record.revokedReason || '—';
+    return `
+      <tr>
+        <td class="key-cell">${key}</td>
+        <td>${email}</td>
+        <td>${source}</td>
+        <td>${date}</td>
+        ${!isActive ? `<td>${revoked}</td>` : '<td>—</td>'}
+        <td>
+          ${isActive ? `<button class="btn-revoke" onclick="revokeKey('${key}')">Revoke</button>` : ''}
+          <button class="btn-delete" onclick="deleteKey('${key}')">Delete</button>
+        </td>
+      </tr>`;
+  }
+
+  res.send(`<!DOCTYPE html><html><head><title>Finest Admin</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:#080808;color:#f0e6c8;font-family:monospace;font-size:12px;padding:24px;}
+    h1{color:#c9a84c;font-size:16px;letter-spacing:0.1em;margin-bottom:20px;}
+    .tabs{display:flex;gap:2px;margin-bottom:16px;}
+    .tab{padding:8px 18px;background:#101010;border:1px solid #252525;border-radius:5px 5px 0 0;cursor:pointer;color:#6a6050;}
+    .tab.active{background:#181818;border-bottom-color:#181818;color:#c9a84c;}
+    .panel{display:none;background:#181818;border:1px solid #252525;border-radius:0 5px 5px 5px;padding:16px;}
+    .panel.active{display:block;}
+    table{width:100%;border-collapse:collapse;}
+    th{text-align:left;color:#6a6050;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:6px 10px;border-bottom:1px solid #252525;}
+    td{padding:8px 10px;border-bottom:1px solid #151515;vertical-align:middle;}
+    .key-cell{color:#c9a84c;letter-spacing:0.06em;}
+    tr:hover td{background:#1e1e1e;}
+    .btn-revoke{background:#3a2a0a;border:1px solid #7a5e1e;color:#c9a84c;font-family:monospace;font-size:10px;padding:3px 10px;border-radius:4px;cursor:pointer;margin-right:4px;}
+    .btn-revoke:hover{background:#5a3e10;}
+    .btn-delete{background:#2a0a0a;border:1px solid #7a1e1e;color:#c06060;font-family:monospace;font-size:10px;padding:3px 10px;border-radius:4px;cursor:pointer;}
+    .btn-delete:hover{background:#4a1010;}
+    .gen-form{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+    .gen-form input{background:#101010;border:1px solid #252525;border-radius:4px;color:#f0e6c8;font-family:monospace;font-size:12px;padding:7px 10px;outline:none;}
+    .gen-form input:focus{border-color:#7a5e1e;}
+    .btn-gen{background:#c9a84c;border:none;border-radius:4px;color:#080808;font-family:monospace;font-size:12px;font-weight:700;padding:7px 16px;cursor:pointer;}
+    .btn-gen:hover{background:#e4be6a;}
+    .count{color:#6a6050;font-size:11px;margin-bottom:10px;}
+    .toast{position:fixed;bottom:20px;right:20px;background:#181818;border:1px solid #7a5e1e;color:#c9a84c;padding:10px 16px;border-radius:6px;font-size:12px;display:none;}
+  </style></head>
+  <body>
+  <h1>FINEST ADMIN</h1>
+
+  <div class="gen-form">
+    <input id="gen-email" placeholder="Email or note" style="width:200px"/>
+    <input id="gen-plan" placeholder="Plan (member)" style="width:130px"/>
+    <button class="btn-gen" onclick="generateKey()">+ Generate Key</button>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('active')">Active (${active.length})</div>
+    <div class="tab" onclick="switchTab('inactive')">Inactive (${inactive.length})</div>
+  </div>
+
+  <div id="panel-active" class="panel active">
+    <table>
+      <thead><tr><th>Key</th><th>Email / User</th><th>Source</th><th>Created</th><th>Last Seen</th><th>Actions</th></tr></thead>
+      <tbody>${active.map(([k,r]) => row(k,r,true)).join('')}</tbody>
+    </table>
+  </div>
+
+  <div id="panel-inactive" class="panel">
+    <table>
+      <thead><tr><th>Key</th><th>Email / User</th><th>Source</th><th>Created</th><th>Reason</th><th>Actions</th></tr></thead>
+      <tbody>${inactive.map(([k,r]) => row(k,r,false)).join('')}</tbody>
+    </table>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const SECRET = '${secret}';
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='active')||(i===1&&tab==='inactive')));
+      document.getElementById('panel-active').classList.toggle('active', tab==='active');
+      document.getElementById('panel-inactive').classList.toggle('active', tab==='inactive');
+    }
+
+    function toast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.style.display = 'block';
+      setTimeout(() => t.style.display = 'none', 2500);
+    }
+
+    async function deleteKey(key) {
+      if (!confirm('Delete ' + key + '?')) return;
+      const r = await fetch('/admin/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({secret:SECRET, key}) });
+      const d = await r.json();
+      if (d.deleted) { toast('Deleted ' + key); location.reload(); }
+      else toast('Error: ' + (d.error || 'unknown'));
+    }
+
+    async function revokeKey(key) {
+      if (!confirm('Revoke ' + key + '?')) return;
+      const r = await fetch('/revoke', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({secret:SECRET, key}) });
+      const d = await r.json();
+      if (d.revoked) { toast('Revoked ' + key); location.reload(); }
+      else toast('Error: ' + (d.error || 'unknown'));
+    }
+
+    async function generateKey() {
+      const email = document.getElementById('gen-email').value || 'manual';
+      const plan  = document.getElementById('gen-plan').value  || 'member';
+      const r = await fetch('/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({secret:SECRET, email, plan}) });
+      const d = await r.json();
+      if (d.key) { toast('Generated: ' + d.key); location.reload(); }
+      else toast('Error: ' + (d.error || 'unknown'));
+    }
+  </script>
+  </body></html>`);
+});
+
+// ─────────────────────────────────────────────
 // POST /admin/assign-roles
 // Assigns Checkout Goat role to all active Discord keys
 // ─────────────────────────────────────────────
