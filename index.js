@@ -86,6 +86,24 @@ async function getGuildRoles() {
   return discordFetch(`/guilds/${DISCORD_SERVER_ID}/roles`, `Bot ${DISCORD_BOT_TOKEN}`);
 }
 
+const MEMBER_ROLE_NAME = process.env.MEMBER_ROLE_NAME || '✅Out GOAT';
+
+async function assignMemberRole(userId) {
+  if (!DISCORD_BOT_TOKEN || !userId) return;
+  try {
+    const roles = await getGuildRoles();
+    const role  = roles.find(r => r.name === MEMBER_ROLE_NAME);
+    if (!role) { console.warn(`[Bot] Role "${MEMBER_ROLE_NAME}" not found`); return; }
+    await fetch(`https://discord.com/api/v10/guilds/${DISCORD_SERVER_ID}/members/${userId}/roles/${role.id}`, {
+      method:  'PUT',
+      headers: { 'Authorization': `Bot ${DISCORD_BOT_TOKEN}`, 'Content-Type': 'application/json' },
+    });
+    console.log(`[Bot] Assigned "${MEMBER_ROLE_NAME}" to userId ${userId}`);
+  } catch (err) {
+    console.error('[Bot] Failed to assign role:', err.message);
+  }
+}
+
 async function checkMemberQualifies(userId) {
   try {
     const [member, allRoles] = await Promise.all([getGuildMember(userId), getGuildRoles()]);
@@ -412,6 +430,7 @@ app.get('/auth/discord/callback', async (req, res) => {
     };
     saveKeys(keys);
     console.log(`[Discord] New key for ${user.username} (${user.id}) via "${roleName}": ${newKey}`);
+    assignMemberRole(user.id);
     return res.redirect(`/?key=${encodeURIComponent(newKey)}`);
 
   } catch (err) {
@@ -490,6 +509,7 @@ app.post('/whop-webhook', (req, res) => {
     saveKeys(keys);
     console.log(`[Whop] Key issued for ${email}: ${newKey}`);
     if (email && email !== 'unknown') sendKeyEmail(email, newKey);
+    // Whop buyers don't have a Discord ID at purchase time — role assigned if they later verify via portal
     return res.json({ received: true, key: newKey });
   }
 
