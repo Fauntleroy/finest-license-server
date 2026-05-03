@@ -67,8 +67,8 @@
     if (!data.settings?.autoFill) return;
     const profile = data.profiles?.[data.activeProfile] ?? null;
     if (!profile) return;
-    await waitFor(`${SEL.CC}, ${SEL.expiry}, ${SEL.cvv}`, 8000);
-    await delay(600);
+    await waitFor(`${SEL.CC}, ${SEL.expiry}, ${SEL.cvv}`, 15000);
+    await delay(300);
     fill(profile);
   }
 
