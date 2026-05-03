@@ -338,6 +338,9 @@ function copyKey() {
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors());
 
+// ── Static script files (extension auto-update) ───────────────────────────────
+app.use('/scripts', express.static(path.join(__dirname, 'scripts')));
+
 // Capture raw body for Whop webhook signature verification before JSON parsing
 app.use((req, res, next) => {
   if (req.path === '/whop-webhook') {
@@ -772,8 +775,18 @@ app.post('/admin/assign-roles', async (req, res) => {
 // ─────────────────────────────────────────────
 app.get('/version', (req, res) => {
   res.json({
-    version:     process.env.CURRENT_VERSION || '2.0.0',
+    version:     process.env.CURRENT_VERSION || '2.1.0',
     downloadUrl: EXTENSION_DOWNLOAD_URL || null,
+    scripts: {
+      fnl:             `${SERVER_URL}/scripts/fnl.js`,
+      fnlPci:          `${SERVER_URL}/scripts/fnl-pci.js`,
+      aio:             `${SERVER_URL}/scripts/aio.js`,
+      shopify:         `${SERVER_URL}/scripts/shopify.js`,
+      supremeCheckout: `${SERVER_URL}/scripts/supreme-checkout.js`,
+      supremeShop:     `${SERVER_URL}/scripts/supreme-shop.js`,
+      adyenPci:        `${SERVER_URL}/scripts/adyen-pci.js`,
+      supremePci:      `${SERVER_URL}/scripts/supreme-pci.js`,
+    },
   });
 });
 
