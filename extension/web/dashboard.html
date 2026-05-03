@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finest Checkouts</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon"><img src="images/logo.png" alt="Finest"></div>
+      <div>
+        <div class="brand-name">FINEST</div>
+        <div class="brand-sub">Checkouts</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-item active" data-view="profiles">
+        <span class="nav-icon">⊞</span> Profiles
+      </button>
+      <button class="nav-item" data-view="settings">
+        <span class="nav-icon">⊙</span> Settings
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="btn-ghost" id="btn-import">Import JSON</button>
+      <button class="btn-ghost" id="btn-export">Export JSON</button>
+      <input type="file" id="file-import" accept=".json" style="display:none">
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <main class="main">
+
+    <!-- PROFILES VIEW -->
+    <section class="view" id="view-profiles">
+      <div class="view-header">
+        <h1 class="view-title">Profiles</h1>
+        <button class="btn-primary" id="btn-new-profile">+ New Profile</button>
+      </div>
+
+      <div class="profile-grid" id="profile-grid">
+        <!-- populated by JS -->
+      </div>
+
+      <div class="empty-state" id="empty-profiles">
+        <p>No profiles yet.</p>
+        <button class="btn-primary" id="btn-new-profile-empty">Create your first profile</button>
+      </div>
+    </section>
+
+    <!-- EDITOR VIEW -->
+    <section class="view hidden" id="view-editor">
+      <div class="view-header">
+        <button class="btn-back" id="btn-back">← Back</button>
+        <h1 class="view-title" id="editor-title">New Profile</h1>
+        <div class="editor-actions">
+          <button class="btn-danger" id="btn-delete-profile">Delete</button>
+          <button class="btn-primary" id="btn-save-profile">Save</button>
+        </div>
+      </div>
+
+      <form class="editor-form" id="profile-form" autocomplete="off">
+
+        <fieldset class="form-section">
+          <legend>Profile</legend>
+          <div class="field-row">
+            <div class="field">
+              <label>Profile Name</label>
+              <input type="text" id="f-profileName" placeholder="e.g. Main Card" required>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="form-section">
+          <legend>Contact</legend>
+          <div class="field-row">
+            <div class="field"><label>First Name</label><input type="text" id="f-fName" placeholder="John"></div>
+            <div class="field"><label>Last Name</label><input type="text"  id="f-lName" placeholder="Doe"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Email</label><input type="email" id="f-email" placeholder="john@example.com"></div>
+            <div class="field"><label>Phone</label><input type="tel"   id="f-phone" placeholder="555-000-0000"></div>
+          </div>
+        </fieldset>
+
+        <fieldset class="form-section">
+          <legend>Shipping Address</legend>
+          <div class="field-row">
+            <div class="field full"><label>Address Line 1</label><input type="text" id="f-address"  placeholder="123 Main St"></div>
+          </div>
+          <div class="field-row">
+            <div class="field full"><label>Address Line 2</label><input type="text" id="f-address2" placeholder="Apt 4B (optional)"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>City</label>   <input type="text" id="f-city"    placeholder="New York"></div>
+            <div class="field"><label>State / Province</label><input type="text" id="f-state"   placeholder="NY"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>ZIP / Postal</label><input type="text" id="f-zip"     placeholder="10001"></div>
+            <div class="field"><label>Country</label><input type="text" id="f-country" placeholder="US"></div>
+          </div>
+        </fieldset>
+
+        <fieldset class="form-section">
+          <legend>Payment</legend>
+          <div class="field-row">
+            <div class="field full">
+              <label>Card Number</label>
+              <input type="text" id="f-CC" placeholder="4111 1111 1111 1111" maxlength="19" autocomplete="off">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Expiry (MM/YY)</label><input type="text" id="f-expiry" placeholder="06/26" maxlength="5"></div>
+            <div class="field"><label>CVV</label>           <input type="text" id="f-cvv"    placeholder="123"   maxlength="4" autocomplete="off"></div>
+          </div>
+          <div class="field-row">
+            <div class="field full"><label>Name on Card</label><input type="text" id="f-nameOnCard" placeholder="JOHN DOE"></div>
+          </div>
+        </fieldset>
+
+      </form>
+    </section>
+
+    <!-- SETTINGS VIEW -->
+    <section class="view hidden" id="view-settings">
+      <div class="view-header">
+        <h1 class="view-title">Settings</h1>
+      </div>
+
+      <div class="settings-list">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Auto-Fill on Load</div>
+            <div class="setting-desc">Automatically fill checkout forms when a supported page loads</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="s-autoFill">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/dashboard.js"></script>
+</body>
+</html>

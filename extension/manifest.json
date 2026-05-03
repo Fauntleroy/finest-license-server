@@ -1,0 +1,140 @@
+{
+  "name": "Finest Checkouts",
+  "version": "2.1.0",
+  "manifest_version": 3,
+  "description": "Profile-based autofill for checkout forms",
+  "author": "Finest Checkouts",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "storage",
+    "tabs",
+    "activeTab",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://*/*",
+    "http://*/*",
+    "https://*.railway.app/*",
+    "https://checkout.pci.shopifyinc.com/*"
+  ],
+  "action": {
+    "default_title": "Finest Checkouts",
+    "default_popup": "web/popup.html",
+    "default_icon": {
+      "16":  "web/images/logo16.png",
+      "48":  "web/images/logo48.png",
+      "128": "web/images/logo128.png"
+    }
+  },
+  "options_page": "web/dashboard.html",
+  "icons": {
+    "16":  "web/images/logo16.png",
+    "48":  "web/images/logo48.png",
+    "128": "web/images/logo128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*/*/checkouts/*",
+        "https://*/*/checkout*"
+      ],
+      "js": [
+        "js/shopify.js"
+      ],
+      "run_at": "document_end",
+      "exclude_matches": [
+        "https://us.supreme.com/*",
+        "https://www.supremenewyork.com/*"
+      ]
+    },
+    {
+      "matches": [
+        "https://www.supremenewyork.com/checkout*",
+        "https://us.supreme.com/checkouts/*",
+        "https://us.supreme.com/*/checkouts/*"
+      ],
+      "js": [
+        "js/supreme-checkout.js"
+      ],
+      "run_at": "document_end",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://www.supremenewyork.com/shop/*",
+        "https://us.supreme.com/products/*",
+        "https://us.supreme.com/collections/*"
+      ],
+      "js": [
+        "js/supreme-shop.js"
+      ],
+      "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "https://www.finishline.com/checkout*",
+        "https://www.finishline.com/store/checkout/*",
+        "https://www.jdsports.com/checkout*",
+        "https://www.jdsports.com/store/checkout/*"
+      ],
+      "js": [
+        "js/fnl.js"
+      ],
+      "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "js/aio.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true,
+      "exclude_matches": [
+        "https://checkout.pci.shopifyinc.com/*",
+        "https://checkoutshopper-live-us.adyen.com/*",
+        "https://checkoutshopper-live.adyen.com/*",
+        "https://request.eprotect.vantivcnp.com/*",
+        "https://us.supreme.com/*",
+        "https://www.supremenewyork.com/*"
+      ]
+    },
+    {
+      "matches": [
+        "https://checkout.pci.shopifyinc.com/*"
+      ],
+      "js": [
+        "js/supreme-pci.js"
+      ],
+      "run_at": "document_end",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://checkoutshopper-live-us.adyen.com/*",
+        "https://checkoutshopper-live.adyen.com/*"
+      ],
+      "js": [
+        "js/adyen-pci.js"
+      ],
+      "run_at": "document_end",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://request.eprotect.vantivcnp.com/*"
+      ],
+      "js": [
+        "js/fnl-pci.js"
+      ],
+      "run_at": "document_end",
+      "all_frames": true
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
