@@ -562,6 +562,76 @@ app.post('/generate', (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// POST /broadcast  (admin — send update email to all users)
+// ─────────────────────────────────────────────
+app.post('/broadcast', async (req, res) => {
+  const { secret } = req.body;
+  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
+  if (!RESEND_API_KEY) return res.status(500).json({ error: 'RESEND_API_KEY not set' });
+
+  const keys    = loadKeys();
+  const version = process.env.CURRENT_VERSION || '2.2.0';
+  const downloadUrl = EXTENSION_DOWNLOAD_URL || '#';
+
+  const html = `
+    <div style="background:#080808;padding:40px 32px;max-width:480px;margin:0 auto;font-family:monospace">
+      <div style="color:#c9a84c;font-size:20px;font-weight:700;letter-spacing:0.1em;margin-bottom:8px">FINEST CHECKOUTS</div>
+      <div style="color:#6a6050;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:28px">Update Available — v${version}</div>
+
+      <p style="color:#f0e6c8;font-size:15px;font-weight:700;margin-bottom:12px">Version ${version} is out — and it's a big one.</p>
+
+      <p style="color:#c8bfaa;font-size:13px;margin-bottom:20px">We've made major improvements to how Finest Checkouts fills payment fields, especially on cold loads (first visit with no session cookie). Here's what's new:</p>
+
+      <div style="background:#181818;border-left:3px solid #c9a84c;padding:14px 18px;margin-bottom:20px">
+        <p style="color:#c9a84c;font-size:12px;font-weight:700;letter-spacing:0.1em;margin:0 0 10px">WHAT'S NEW IN v${version}</p>
+        <ul style="color:#f0e6c8;font-size:13px;margin:0;padding-left:18px;line-height:1.8">
+          <li>Card number &amp; CVV now fill reliably on first visit (cold load)</li>
+          <li>Expiry date fills the instant the field appears — no more delays</li>
+          <li>Faster across the board — settlement time cut in half</li>
+          <li>Auto-update system — future updates apply with one click from the popup, no re-downloading</li>
+          <li>Supported sites expanded: Finish Line, JD Sports, Supreme, Kith, BAPE, Stussy, Palace + thousands of Shopify stores</li>
+        </ul>
+      </div>
+
+      <p style="color:#c8bfaa;font-size:13px;margin-bottom:20px">If you already have the extension installed, just click <strong style="color:#c9a84c">Apply Now</strong> in the popup — it'll update in seconds without re-downloading. Or grab the new zip below.</p>
+
+      <p style="margin:20px 0">
+        <a href="${downloadUrl}" style="background:#c9a84c;color:#080808;padding:12px 28px;border-radius:5px;text-decoration:none;font-weight:700;font-family:monospace;font-size:14px">Download v${version}</a>
+      </p>
+      <p style="color:#555;font-size:11px;margin-top:6px">Install: unzip → chrome://extensions → Developer Mode → Load unpacked → select folder</p>
+
+      <hr style="border:none;border-top:1px solid #1e1e1e;margin:28px 0"/>
+      <p style="color:#3a3530;font-size:11px">Questions? Reply to this email.<br/>Finest Checkouts — Only the finest.</p>
+    </div>`;
+
+  const emails = [...new Set(
+    Object.values(keys)
+      .map(r => r.email)
+      .filter(e => e && e !== 'manual' && e !== 'unknown' && e.includes('@'))
+  )];
+
+  let sent = 0, failed = 0;
+  for (const email of emails) {
+    try {
+      const r = await fetch('https://api.resend.com/emails', {
+        method:  'POST',
+        headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: FROM_EMAIL, to: [email], subject: `Finest Checkouts v${version} — Major Update`, html }),
+      });
+      if (r.ok) { sent++; console.log(`[Broadcast] Sent to ${email}`); }
+      else { failed++; console.error(`[Broadcast] Failed ${email}:`, await r.text()); }
+    } catch (err) {
+      failed++;
+      console.error(`[Broadcast] Error ${email}:`, err.message);
+    }
+    // Small delay to stay within Resend rate limits
+    await new Promise(r => setTimeout(r, 100));
+  }
+
+  return res.json({ sent, failed, total: emails.length });
+});
+
+// ─────────────────────────────────────────────
 // POST /revoke
 // ─────────────────────────────────────────────
 app.post('/revoke', (req, res) => {
