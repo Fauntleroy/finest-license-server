@@ -64,7 +64,7 @@
   }
 
   function selectOption(el, value) {
-    if (!el || !value) return;
+    if (!el || !value || !el.options) return;
     const v = value.toLowerCase().trim();
     for (const opt of el.options) {
       if (opt.value.toLowerCase() === v || opt.text.toLowerCase().includes(v)) {
