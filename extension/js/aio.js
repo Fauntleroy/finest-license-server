@@ -48,22 +48,22 @@
   const naturalDelay = () => delay(20 + Math.random() * 30); // 20–50ms per field
 
   const FIELD_MAP = [
-    { keys: ['firstname', 'first_name', 'fname', 'first-name'],  field: 'fName' },
-    { keys: ['lastname',  'last_name',  'lname', 'last-name'],   field: 'lName' },
-    { keys: ['fullname',  'full_name',  'full-name'],             field: '_fullName' },
-    { keys: ['email'],                                            field: 'email' },
-    { keys: ['phone', 'telephone', 'mobile'],                    field: 'phone' },
-    { keys: ['address1', 'address_1', 'addr1', 'street'],        field: 'address' },
-    { keys: ['address2', 'address_2', 'addr2', 'apt', 'suite'],  field: 'address2' },
-    { keys: ['city'],                                             field: 'city' },
-    { keys: ['province', 'state', 'region'],                     field: 'state' },
-    { keys: ['zip', 'postal', 'postcode', 'post_code'],          field: 'zip' },
-    { keys: ['country'],                                          field: 'country' },
-    { keys: ['cardnumber', 'card_number', 'cc-number', 'ccnumber', 'number'], field: 'CC' },
-    { keys: ['expiry', 'expiration', 'exp-date', 'cc-exp'],      field: 'expiry' },
-    { keys: ['exp-month', 'expmonth', 'cc-exp-month'],           field: '_expMonth' },
-    { keys: ['exp-year',  'expyear',  'cc-exp-year'],            field: '_expYear' },
-    { keys: ['cvv', 'cvc', 'cvv2', 'security code', 'security', 'csc'], field: 'cvv' },
+    { keys: ['firstname', 'first_name', 'fname', 'first-name', 'given-name'],  field: 'fName' },
+    { keys: ['lastname',  'last_name',  'lname', 'last-name',  'family-name'], field: 'lName' },
+    { keys: ['fullname',  'full_name',  'full-name'],                           field: '_fullName' },
+    { keys: ['email'],                                                           field: 'email' },
+    { keys: ['phone', 'telephone', 'mobile', 'tel'],                           field: 'phone' },
+    { keys: ['address1', 'address_1', 'addr1', 'street', 'address-line1'],     field: 'address' },
+    { keys: ['address2', 'address_2', 'addr2', 'apt', 'suite', 'address-line2'], field: 'address2' },
+    { keys: ['city', 'address-level2'],                                         field: 'city' },
+    { keys: ['province', 'state', 'region', 'address-level1'],                 field: 'state' },
+    { keys: ['zip', 'postal', 'postcode', 'post_code', 'postal-code'],         field: 'zip' },
+    { keys: ['country'],                                                         field: 'country' },
+    { keys: ['cvv', 'cvc', 'cvv2', 'cvnumber', 'security code', 'security', 'csc'], field: 'cvv' },
+    { keys: ['cardnumber', 'card_number', 'cc-number', 'ccnumber', 'number'],      field: 'CC' },
+    { keys: ['expiry', 'expiration', 'exp-date', 'cc-exp'],                        field: 'expiry' },
+    { keys: ['exp-month', 'expmonth', 'cc-exp-month'],                             field: '_expMonth' },
+    { keys: ['exp-year',  'expyear',  'cc-exp-year'],                              field: '_expYear' },
     { keys: ['nameoncard', 'name_on_card', 'name on card', 'cardholder', 'cc-name', 'ccname'], field: 'nameOnCard' },
   ];
 
@@ -146,6 +146,19 @@
     }
   });
 
+  function waitFor(selector, timeout = 8000) {
+    return new Promise(resolve => {
+      const el = document.querySelector(selector);
+      if (el) return resolve(el);
+      const obs = new MutationObserver(() => {
+        const found = document.querySelector(selector);
+        if (found) { obs.disconnect(); resolve(found); }
+      });
+      obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
+      setTimeout(() => { obs.disconnect(); resolve(null); }, timeout);
+    });
+  }
+
   async function maybeAutoFill() {
     const data = await chrome.storage.local.get(['settings', 'profiles', 'activeProfile']);
     if (!data.settings?.autoFill) return;
@@ -157,6 +170,8 @@
     if (!isCheckout) return;
     // Back off if a dedicated script is already handling this page
     if (window.__finestSupreme || window.__finestShopify || window.__finestFNL || window.__finestPCI) return;
+    // Wait for form fields to render (handles React/SPA checkouts like Nike)
+    await waitFor('input[autocomplete], input[name], input[id]', 8000);
     await fillForm(profile);
   }
 

@@ -306,6 +306,10 @@ function showUpdateBanner(version, scripts, downloadUrl) {
 async function init() {
   const body = document.getElementById('popup-body');
 
+  // Show version number
+  const verEl = document.getElementById('popup-version');
+  if (verEl) verEl.textContent = `v${chrome.runtime.getManifest().version}`;
+
   // Check if already activated
   const valid = await License.isValid();
 
