@@ -703,6 +703,7 @@ app.get('/admin', (req, res) => {
     const source = record.source || '—';
     const email  = record.email || record.discordTag || '—';
     const date   = record.createdAt ? new Date(record.createdAt).toLocaleDateString() : '—';
+    const lastSeen = record.lastSeen ? new Date(record.lastSeen).toLocaleString() : '—';
     const revoked = record.revokedReason || '—';
     return `
       <tr>
@@ -710,7 +711,7 @@ app.get('/admin', (req, res) => {
         <td>${email}</td>
         <td>${source}</td>
         <td>${date}</td>
-        ${!isActive ? `<td>${revoked}</td>` : '<td>—</td>'}
+        ${!isActive ? `<td>${revoked}</td>` : `<td>${lastSeen}</td>`}
         <td>
           ${isActive ? `<button class="btn-revoke" onclick="revokeKey('${key}')">Revoke</button>` : ''}
           <button class="btn-delete" onclick="deleteKey('${key}')">Delete</button>
