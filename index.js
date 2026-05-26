@@ -145,8 +145,9 @@ async function exchangeDiscordCode(code) {
 }
 
 // ── Email via Resend ──────────────────────────────────────────────────────────
+// Returns true on success, false on failure (so callers can mark the key for retry).
 async function sendKeyEmail(toEmail, key) {
-  if (!RESEND_API_KEY) { console.warn('[Email] RESEND_API_KEY not set — skipping'); return; }
+  if (!RESEND_API_KEY) { console.warn('[Email] RESEND_API_KEY not set — skipping'); return false; }
 
   const downloadSection = EXTENSION_DOWNLOAD_URL
     ? `<p style="margin:16px 0"><a href="${EXTENSION_DOWNLOAD_URL}" style="background:#c9a84c;color:#080808;padding:12px 24px;border-radius:5px;text-decoration:none;font-weight:700;font-family:monospace">Download Extension</a></p>
@@ -176,12 +177,47 @@ async function sendKeyEmail(toEmail, key) {
     if (!res.ok) {
       const err = await res.text();
       console.error('[Email] Resend error:', err);
-    } else {
-      console.log(`[Email] Key sent to ${toEmail}`);
+      return false;
     }
+    console.log(`[Email] Key sent to ${toEmail}`);
+    return true;
   } catch (err) {
     console.error('[Email] Failed to send:', err.message);
+    return false;
   }
+}
+
+// ── Email retry queue ─────────────────────────────────────────────────────────
+// Marks email status on the key record so failed emails can be retried later
+// (on startup, on cron, or manually from the admin panel).
+async function sendKeyEmailTracked(toEmail, key) {
+  const ok = await sendKeyEmail(toEmail, key);
+  const keys = loadKeys();
+  if (keys[key]) {
+    keys[key].emailSent           = ok;
+    keys[key].emailLastAttempt    = new Date().toISOString();
+    keys[key].emailAttempts       = (keys[key].emailAttempts || 0) + 1;
+    if (ok) keys[key].emailSentAt = new Date().toISOString();
+    saveKeys(keys);
+  }
+  return ok;
+}
+
+async function retryPendingEmails() {
+  const keys    = loadKeys();
+  const pending = Object.entries(keys).filter(
+    ([, r]) => r.status === 'active' && r.email && r.email !== 'unknown' && r.email !== 'manual' && r.email.includes('@') && r.emailSent === false
+  );
+  if (!pending.length) return { retried: 0, sent: 0, failed: 0 };
+  console.log(`[Email Retry] Found ${pending.length} pending email(s) — retrying`);
+  let sent = 0, failed = 0;
+  for (const [key, record] of pending) {
+    const ok = await sendKeyEmailTracked(record.email, key);
+    if (ok) sent++; else failed++;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  console.log(`[Email Retry] Done — sent: ${sent}, failed: ${failed}`);
+  return { retried: pending.length, sent, failed };
 }
 
 // ── Portal HTML ───────────────────────────────────────────────────────────────
@@ -508,10 +544,11 @@ app.post('/whop-webhook', (req, res) => {
       plan:      'member',
       createdAt: new Date().toISOString(),
       lastSeen:  null,
+      emailSent: false,
     };
     saveKeys(keys);
     console.log(`[Whop] Key issued for ${email}: ${newKey}`);
-    if (email && email !== 'unknown') sendKeyEmail(email, newKey);
+    if (email && email !== 'unknown') sendKeyEmailTracked(email, newKey);
     // Whop buyers don't have a Discord ID at purchase time — role assigned if they later verify via portal
     return res.json({ received: true, key: newKey });
   }
@@ -548,6 +585,7 @@ app.post('/generate', (req, res) => {
 
   const keys   = loadKeys();
   const newKey = generateKey();
+  const isRealEmail = email && email !== 'manual' && email.includes('@');
   keys[newKey] = {
     status:    'active',
     email:     email || 'manual',
@@ -555,10 +593,21 @@ app.post('/generate', (req, res) => {
     plan:      plan  || 'member',
     createdAt: new Date().toISOString(),
     lastSeen:  null,
+    ...(isRealEmail && { emailSent: false }),
   };
   saveKeys(keys);
   console.log(`[Manual] Key for ${email}: ${newKey}`);
+  if (isRealEmail) sendKeyEmailTracked(email, newKey);
   return res.json({ key: newKey });
+});
+
+// ─────────────────────────────────────────────
+// POST /admin/retry-emails — manually retry pending failed emails
+// ─────────────────────────────────────────────
+app.post('/admin/retry-emails', async (req, res) => {
+  if (req.body.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
+  const result = await retryPendingEmails();
+  return res.json(result);
 });
 
 // ─────────────────────────────────────────────
@@ -698,6 +747,9 @@ app.get('/admin', (req, res) => {
   const keys = loadKeys();
   const active   = Object.entries(keys).filter(([,r]) => r.status === 'active');
   const inactive = Object.entries(keys).filter(([,r]) => r.status !== 'active');
+  const pendingEmails = Object.entries(keys).filter(
+    ([,r]) => r.status === 'active' && r.email && r.email.includes('@') && r.emailSent === false
+  );
 
   function row(key, record, isActive) {
     const source = record.source || '—';
@@ -745,9 +797,23 @@ app.get('/admin', (req, res) => {
     .btn-gen:hover{background:#e4be6a;}
     .count{color:#6a6050;font-size:11px;margin-bottom:10px;}
     .toast{position:fixed;bottom:20px;right:20px;background:#181818;border:1px solid #7a5e1e;color:#c9a84c;padding:10px 16px;border-radius:6px;font-size:12px;display:none;}
+    .alert{background:#2a0a0a;border:1px solid #c06060;border-radius:5px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+    .alert-text{color:#e89898;font-size:12px;}
+    .alert-text strong{color:#f0c0c0;}
+    .btn-retry{background:#c06060;border:none;border-radius:4px;color:#080808;font-family:monospace;font-size:11px;font-weight:700;padding:7px 14px;cursor:pointer;white-space:nowrap;}
+    .btn-retry:hover{background:#e08080;}
   </style></head>
   <body>
   <h1>FINEST ADMIN</h1>
+
+  ${pendingEmails.length ? `
+  <div class="alert">
+    <div class="alert-text">
+      <strong>⚠ ${pendingEmails.length} licence ${pendingEmails.length === 1 ? 'email' : 'emails'} failed to send.</strong>
+      Purchases went through but recipients haven't received their keys. Resend will retry automatically every 10 min — or click below to retry now.
+    </div>
+    <button class="btn-retry" onclick="retryEmails()">↻ Retry Now</button>
+  </div>` : ''}
 
   <div class="gen-form">
     <input id="gen-email" placeholder="Email or note" style="width:200px"/>
@@ -805,6 +871,14 @@ app.get('/admin', (req, res) => {
       const d = await r.json();
       if (d.revoked) { toast('Revoked ' + key); location.reload(); }
       else toast('Error: ' + (d.error || 'unknown'));
+    }
+
+    async function retryEmails() {
+      toast('Retrying pending emails...');
+      const r = await fetch('/admin/retry-emails', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({secret:SECRET}) });
+      const d = await r.json();
+      toast('Sent: ' + d.sent + ' / Failed: ' + d.failed);
+      setTimeout(() => location.reload(), 1500);
     }
 
     async function generateKey() {
@@ -959,4 +1033,14 @@ cron.schedule('0 10 * * 0', async () => {
   console.log('[Cron] Weekly check done');
 });
 
-app.listen(PORT, () => console.log(`Finest License Server running on port ${PORT}`));
+// ── Email retry cron — every 10 minutes ───────────────────────────────────────
+// Retries any keys with emailSent=false (e.g. emails that failed during
+// Resend outage). Cheap no-op when nothing is pending.
+cron.schedule('*/10 * * * *', () => { retryPendingEmails().catch(() => {}); });
+
+app.listen(PORT, () => {
+  console.log(`Finest License Server running on port ${PORT}`);
+  // On startup, retry any emails that failed previously (e.g. during downtime).
+  // Runs once after a short delay so Resend connectivity is settled.
+  setTimeout(() => { retryPendingEmails().catch(() => {}); }, 5000);
+});
