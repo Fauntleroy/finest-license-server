@@ -19,6 +19,7 @@ const DISCORD_SERVER_ID     = process.env.DISCORD_SERVER_ID    || '7562116945475
 const EXTENSION_DOWNLOAD_URL= process.env.EXTENSION_DOWNLOAD_URL || '';
 const RESEND_API_KEY        = process.env.RESEND_API_KEY         || '';
 const FROM_EMAIL            = process.env.FROM_EMAIL             || 'Finest Checkouts <onboarding@resend.dev>';
+const WHOP_API_KEY          = process.env.WHOP_API_KEY           || '';
 
 // Roles that grant access (role names, lowercase — edit via DISCORD_QUALIFYING_ROLES env var)
 const QUALIFYING_ROLES = (process.env.DISCORD_QUALIFYING_ROLES || 'YouTube Member: Brick Boy Squad,YouTube Member: Cook God,Server Booster,Grandfathered')
@@ -611,6 +612,93 @@ app.post('/admin/retry-emails', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// Whop API helpers — reconcile lost purchases
+// ─────────────────────────────────────────────
+// Fetches every active membership Whop knows about (paginated).
+// Used when Railway was down past Whop's webhook retry window — Whop has
+// the customer, we don't, and this catches that gap.
+async function fetchAllWhopMemberships() {
+  if (!WHOP_API_KEY) throw new Error('WHOP_API_KEY not set');
+  const all = [];
+  let page = 1;
+  for (;;) {
+    const r = await fetch(`https://api.whop.com/api/v5/memberships?page=${page}&per=50&valid=true`, {
+      headers: { 'Authorization': `Bearer ${WHOP_API_KEY}`, 'Accept': 'application/json' },
+    });
+    if (!r.ok) throw new Error(`Whop API ${r.status}: ${await r.text()}`);
+    const j = await r.json();
+    const data = j.data || j.memberships || [];
+    if (!data.length) break;
+    all.push(...data);
+    const total = j.pagination?.total_page || j.total_page || page;
+    if (page >= total) break;
+    page++;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  return all;
+}
+
+// ─────────────────────────────────────────────
+// POST /admin/reconcile-whop — backfill keys for missed Whop purchases
+// ─────────────────────────────────────────────
+app.post('/admin/reconcile-whop', async (req, res) => {
+  if (req.body.secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
+  if (!WHOP_API_KEY) return res.status(500).json({ error: 'WHOP_API_KEY not set in Railway' });
+
+  let memberships;
+  try { memberships = await fetchAllWhopMemberships(); }
+  catch (err) { return res.status(502).json({ error: err.message }); }
+
+  const keys = loadKeys();
+  // Index existing keys by Whop user_id for fast lookup
+  const knownUserIds = new Set(
+    Object.values(keys)
+      .filter(r => r.source === 'whop' && r.userId)
+      .map(r => r.userId)
+  );
+
+  let created = 0, skipped = 0, emailed = 0, emailFailed = 0;
+  const createdList = [];
+
+  for (const m of memberships) {
+    const userId = m.user_id || m.user?.id;
+    const email  = m.user?.email || m.email;
+    const status = m.status || (m.valid ? 'active' : 'inactive');
+    if (!userId || status !== 'active') { skipped++; continue; }
+    if (knownUserIds.has(userId))       { skipped++; continue; }
+
+    const newKey = generateKey();
+    keys[newKey] = {
+      status:    'active',
+      email:     email || 'unknown',
+      userId,
+      source:    'whop',
+      plan:      'member',
+      createdAt: m.created_at ? new Date(m.created_at * 1000).toISOString() : new Date().toISOString(),
+      lastSeen:  null,
+      emailSent: false,
+      reconciled: true,
+    };
+    created++;
+    createdList.push({ key: newKey, email, userId });
+    console.log(`[Reconcile] Created missing key for ${email} (${userId}): ${newKey}`);
+  }
+
+  if (created > 0) saveKeys(keys);
+
+  // Send emails for any new keys with valid email addresses
+  for (const { key, email } of createdList) {
+    if (!email || email === 'unknown' || !email.includes('@')) continue;
+    const ok = await sendKeyEmailTracked(email, key);
+    if (ok) emailed++; else emailFailed++;
+    await new Promise(r => setTimeout(r, 200));
+  }
+
+  console.log(`[Reconcile] Done — created: ${created}, emailed: ${emailed}, emailFailed: ${emailFailed}, skipped: ${skipped}`);
+  return res.json({ totalFromWhop: memberships.length, created, emailed, emailFailed, skipped });
+});
+
+// ─────────────────────────────────────────────
 // POST /broadcast  (admin — send update email to all users)
 // ─────────────────────────────────────────────
 app.post('/broadcast', async (req, res) => {
@@ -819,6 +907,7 @@ app.get('/admin', (req, res) => {
     <input id="gen-email" placeholder="Email or note" style="width:200px"/>
     <input id="gen-plan" placeholder="Plan (member)" style="width:130px"/>
     <button class="btn-gen" onclick="generateKey()">+ Generate Key</button>
+    <button class="btn-gen" style="background:#3a5a7a;color:#f0e6c8" onclick="reconcileWhop()" title="Pull all active Whop memberships and create keys for any we're missing">↻ Reconcile Whop</button>
   </div>
 
   <div class="tabs">
@@ -879,6 +968,16 @@ app.get('/admin', (req, res) => {
       const d = await r.json();
       toast('Sent: ' + d.sent + ' / Failed: ' + d.failed);
       setTimeout(() => location.reload(), 1500);
+    }
+
+    async function reconcileWhop() {
+      if (!confirm('Pull active memberships from Whop and create keys for any we are missing?')) return;
+      toast('Checking Whop... this may take a minute');
+      const r = await fetch('/admin/reconcile-whop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({secret:SECRET}) });
+      const d = await r.json();
+      if (d.error) { toast('Error: ' + d.error); return; }
+      toast('Whop: ' + d.totalFromWhop + ' / Created: ' + d.created + ' / Emailed: ' + d.emailed);
+      setTimeout(() => location.reload(), 2500);
     }
 
     async function generateKey() {
