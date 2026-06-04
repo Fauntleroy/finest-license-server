@@ -170,7 +170,13 @@
   }
 
   // â”€â”€â”€ Run â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  async function isLicensed() {
+    const d = await chrome.storage.local.get(['licenseKey', 'licenseValid']);
+    return !!(d.licenseKey && d.licenseValid);
+  }
+
   async function run() {
+    if (!(await isLicensed())) return;
     const data = await chrome.storage.local.get(['settings', 'profiles', 'activeProfile']);
     if (!data.settings?.autoFill) return;
     const profile = data.profiles?.[data.activeProfile] ?? null;
@@ -185,7 +191,11 @@
 
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.action === 'FILL_FORM' && msg.profile) {
-      fillSupreme(msg.profile).then(() => sendResponse({ ok: true }));
+      (async () => {
+        if (!(await isLicensed())) { sendResponse({ ok: false, error: 'unlicensed' }); return; }
+        await fillSupreme(msg.profile);
+        sendResponse({ ok: true });
+      })();
       return true;
     }
   });

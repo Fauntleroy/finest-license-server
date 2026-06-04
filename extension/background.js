@@ -40,12 +40,35 @@ async function checkForUpdates() {
   } catch {}
 }
 
-// Check on install/update and on every browser startup
-chrome.runtime.onInstalled.addListener(checkForUpdates);
-chrome.runtime.onStartup.addListener(checkForUpdates);
+// ─── License validation ─────────────────────────────────────────────────────
+// Re-checks the stored licence with the server every hour. If revoked, sets
+// licenseValid=false so content scripts stop filling. Server unreachable leaves
+// the cached state alone (don't punish legit users during Railway outages).
+async function validateLicense() {
+  try {
+    const { licenseKey } = await chrome.storage.local.get('licenseKey');
+    if (!licenseKey) return;
+    const res = await fetch(`${SERVER}/validate`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ key: licenseKey.trim().toUpperCase() }),
+    });
+    if (!res.ok) return; // server error → leave cache alone
+    const data = await res.json();
+    await chrome.storage.local.set({ licenseValid: !!data.valid });
+  } catch {
+    // Network/Railway down → leave cached state alone
+  }
+}
 
-// Recurring hourly check via alarm (service workers can be terminated between events)
-chrome.alarms.create('updateCheck', { delayInMinutes: 30, periodInMinutes: 60 });
+// Check on install/update and on every browser startup
+chrome.runtime.onInstalled.addListener(() => { checkForUpdates(); validateLicense(); });
+chrome.runtime.onStartup.addListener(()  => { checkForUpdates(); validateLicense(); });
+
+// Recurring checks via alarms
+chrome.alarms.create('updateCheck',  { delayInMinutes: 30, periodInMinutes: 60 });
+chrome.alarms.create('licenseCheck', { delayInMinutes: 5,  periodInMinutes: 60 });
 chrome.alarms.onAlarm.addListener(({ name }) => {
-  if (name === 'updateCheck') checkForUpdates();
+  if (name === 'updateCheck')  checkForUpdates();
+  if (name === 'licenseCheck') validateLicense();
 });

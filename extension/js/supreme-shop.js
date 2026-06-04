@@ -16,7 +16,13 @@
   if (window.__finestSupremeShop) return;
   window.__finestSupremeShop = true;
 
+  async function isLicensed() {
+    const d = await chrome.storage.local.get(['licenseKey', 'licenseValid']);
+    return !!(d.licenseKey && d.licenseValid);
+  }
+
   async function run() {
+    if (!(await isLicensed())) return;
     const data = await chrome.storage.local.get(['profiles', 'activeProfile', 'settings']);
     const settings = data.settings || {};
     const profiles = data.profiles || {};

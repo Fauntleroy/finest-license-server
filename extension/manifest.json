@@ -1,6 +1,6 @@
 {
   "name": "Finest Checkouts",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "manifest_version": 3,
   "description": "Profile-based autofill for checkout forms",
   "author": "Finest Checkouts",
@@ -99,8 +99,18 @@
         "https://checkoutshopper-live.adyen.com/*",
         "https://request.eprotect.vantivcnp.com/*",
         "https://us.supreme.com/*",
-        "https://www.supremenewyork.com/*"
+        "https://www.supremenewyork.com/*",
+        "https://waitwhile.com/*"
       ]
+    },
+    {
+      "matches": [
+        "https://waitwhile.com/*"
+      ],
+      "js": [
+        "js/waitwhile.js"
+      ],
+      "run_at": "document_idle"
     },
     {
       "matches": [

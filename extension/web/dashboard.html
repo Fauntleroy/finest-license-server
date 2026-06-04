@@ -149,6 +149,33 @@
             <span class="toggle-track"></span>
           </label>
         </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Supreme Waitlist Auto-Booking</div>
+            <div class="setting-desc">Hands-free Waitwhile registration. Picks earliest time slot and submits with your active profile (name, email, phone). Only runs on waitwhile.com.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="s-waitlistAutoBook">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Preferred Supreme Store</div>
+            <div class="setting-desc">Which location to register at when auto-booking is on</div>
+          </div>
+          <select id="s-waitlistStore" class="setting-select">
+            <option value="">— Select store —</option>
+            <option value="supreme-brooklyn">Brooklyn</option>
+            <option value="supreme-chicago">Chicago</option>
+            <option value="supreme-newyork">Manhattan</option>
+            <option value="supreme-sanfrancisco">San Francisco</option>
+            <option value="supreme-losangeles">Los Angeles</option>
+            <option value="suprememiami">Miami</option>
+          </select>
+        </div>
       </div>
     </section>
 
@@ -157,6 +184,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="js/license.js"></script>
 <script src="js/dashboard.js"></script>
 </body>
 </html>

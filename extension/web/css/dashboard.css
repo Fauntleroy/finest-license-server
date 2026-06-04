@@ -403,6 +403,20 @@ html, body {
 .toggle input:checked + .toggle-track { background: var(--gold-dim); border-color: var(--gold); }
 .toggle input:checked + .toggle-track::after { left: 19px; background: var(--gold); }
 
+.setting-select {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 8px 10px;
+  cursor: pointer;
+  min-width: 180px;
+  outline: none;
+}
+.setting-select:focus { border-color: var(--gold-dim); }
+
 /* ── Toast ── */
 .toast {
   position: fixed;

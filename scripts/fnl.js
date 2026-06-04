@@ -166,31 +166,42 @@
     }, 10 * 60 * 1000);
   }
 
-  // Fills expiry (+ CVV fallback) the instant #expiry appears in the DOM â€”
-  // same pattern as the iframe scripts: MutationObserver, no URL dependency.
+  // Fills expiry the moment #expiry is visible.
+  // MutationObserver catches DOM insertions; 150ms poll catches CSS-only
+  // visibility reveals (React showing a pre-mounted but hidden element).
+  // No naturalDelay â€” fills at full speed the instant the field is ready.
   function watchForExpiry(profile) {
     let busy = false;
+
+    function isVisible(el) { return el && el.getBoundingClientRect().height > 0; }
 
     const tryFill = async () => {
       if (busy) return;
       const el = q(SEL.ccExp);
-      if (!el || el.value) return; // absent or already filled
+      if (!el || !isVisible(el) || el.value) return;
       busy = true;
       try {
-        await fillPaymentFields(profile);
+        el.focus();
+        nativeSet(el, profile.expiry);
+        // One microtask â€” lets React flush any pending state update before retry check
+        await Promise.resolve();
+        const el2 = q(SEL.ccExp);
+        if (el2 && !el2.value) { el2.focus(); nativeSet(el2, profile.expiry); }
       } finally {
         busy = false;
       }
     };
 
-    // Fire immediately if already on payment step
     tryFill();
 
-    // Fire on any DOM change â€” catches React inserting #expiry on SPA navigation
+    // Catches DOM insertions
     const obs = new MutationObserver(tryFill);
     obs.observe(document.body, { childList: true, subtree: true });
 
-    setTimeout(() => obs.disconnect(), 10 * 60 * 1000);
+    // Catches CSS-only reveals (React toggling visibility without re-mounting)
+    const poll = setInterval(tryFill, 150);
+
+    setTimeout(() => { obs.disconnect(); clearInterval(poll); }, 10 * 60 * 1000);
   }
 
   async function fillFNL(profile) {
@@ -231,7 +242,13 @@
     await focusFill(q(SEL.ccCvv), profile.cvv);
   }
 
+  async function isLicensed() {
+    const d = await chrome.storage.local.get(['licenseKey', 'licenseValid']);
+    return !!(d.licenseKey && d.licenseValid);
+  }
+
   async function run() {
+    if (!(await isLicensed())) return;
     const data = await chrome.storage.local.get(['settings', 'profiles', 'activeProfile']);
     if (!data.settings?.autoFill) return;
     const profile = data.profiles?.[data.activeProfile] ?? null;
@@ -245,8 +262,13 @@
 
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.action === 'FILL_FORM' && msg.profile) {
-      fillFNL(msg.profile).then(() => sendResponse({ ok: true }));
+      (async () => {
+        if (!(await isLicensed())) { sendResponse({ ok: false, error: 'unlicensed' }); return; }
+        await fillFNL(msg.profile);
+        sendResponse({ ok: true });
+      })();
       return true;
     }
   });
 })();
+

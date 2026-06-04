@@ -162,7 +162,9 @@ function formatCC(v) {
 async function loadSettings() {
   const data = await S.get('settings');
   const settings = data.settings || {};
-  document.getElementById('s-autoFill').checked = !!settings.autoFill;
+  document.getElementById('s-autoFill').checked         = !!settings.autoFill;
+  document.getElementById('s-waitlistAutoBook').checked = !!settings.waitlistAutoBook;
+  document.getElementById('s-waitlistStore').value      = settings.waitlistStore || '';
 }
 
 async function saveSetting(key, value) {
@@ -201,7 +203,32 @@ function importProfiles(file) {
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
+function showDashboardGate() {
+  document.body.innerHTML = `
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;
+                background:#080808;color:#f0e6c8;font-family:monospace;padding:32px">
+      <div style="max-width:420px;text-align:center">
+        <div style="font-family:Syne,sans-serif;font-size:18px;font-weight:800;letter-spacing:0.1em;color:#c9a84c;margin-bottom:8px">FINEST CHECKOUTS</div>
+        <div style="color:#7a6f56;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:32px">License Required</div>
+        <p style="font-size:13px;line-height:1.6;margin-bottom:24px">
+          This dashboard is locked. Open the Finest Checkouts popup (click the extension icon in your browser toolbar) and enter your license key to activate.
+        </p>
+        <p style="font-size:11px;color:#7a6f56">
+          Already activated? Your license may have expired or been revoked.
+          Re-enter your key in the popup to re-activate.
+        </p>
+      </div>
+    </div>`;
+}
+
 async function init() {
+  // License gate — block dashboard entirely if no valid license cached.
+  // background.js re-validates with the server every hour and updates licenseValid.
+  if (!(await License.isValid())) {
+    showDashboardGate();
+    return;
+  }
+
   const data = await S.get(['profiles', 'activeProfile']);
   profiles      = data.profiles      || {};
   activeProfile = data.activeProfile || null;
@@ -241,6 +268,13 @@ async function init() {
   // Settings
   document.getElementById('s-autoFill').addEventListener('change', (e) =>
     saveSetting('autoFill', e.target.checked));
+  document.getElementById('s-waitlistAutoBook').addEventListener('change', async (e) => {
+    await saveSetting('waitlistAutoBook', e.target.checked);
+    // Clear the stopped flag when toggling — fresh start each time
+    await chrome.storage.local.set({ waitwhileStopped: false });
+  });
+  document.getElementById('s-waitlistStore').addEventListener('change', (e) =>
+    saveSetting('waitlistStore', e.target.value));
 
   // Import / Export
   document.getElementById('btn-export').addEventListener('click', exportProfiles);
