@@ -1030,6 +1030,7 @@ app.get('/version', (req, res) => {
       supremeShop:     `${SERVER_URL}/scripts/supreme-shop.js`,
       adyenPci:        `${SERVER_URL}/scripts/adyen-pci.js`,
       supremePci:      `${SERVER_URL}/scripts/supreme-pci.js`,
+      waitwhile:       `${SERVER_URL}/scripts/waitwhile.js`,
     },
   });
 });
