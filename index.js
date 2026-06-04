@@ -707,35 +707,48 @@ app.post('/broadcast', async (req, res) => {
   if (!RESEND_API_KEY) return res.status(500).json({ error: 'RESEND_API_KEY not set' });
 
   const keys    = loadKeys();
-  const version = process.env.CURRENT_VERSION || '2.2.0';
+  const version = process.env.CURRENT_VERSION || '2.2.3';
   const downloadUrl = EXTENSION_DOWNLOAD_URL || '#';
 
   const html = `
-    <div style="background:#080808;padding:40px 32px;max-width:480px;margin:0 auto;font-family:monospace">
+    <div style="background:#080808;padding:40px 32px;max-width:520px;margin:0 auto;font-family:monospace">
       <div style="color:#c9a84c;font-size:20px;font-weight:700;letter-spacing:0.1em;margin-bottom:8px">FINEST CHECKOUTS</div>
-      <div style="color:#6a6050;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:28px">Update Available — v${version}</div>
+      <div style="color:#6a6050;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:28px">v${version} — In-Store + Online Upgrades</div>
 
-      <p style="color:#f0e6c8;font-size:15px;font-weight:700;margin-bottom:12px">Version ${version} is out — and it's a big one.</p>
+      <p style="color:#f0e6c8;font-size:15px;font-weight:700;margin-bottom:12px">Two big things this drop.</p>
 
-      <p style="color:#c8bfaa;font-size:13px;margin-bottom:20px">We've made major improvements to how Finest Checkouts fills payment fields, especially on cold loads (first visit with no session cookie). Here's what's new:</p>
+      <p style="color:#c8bfaa;font-size:13px;margin-bottom:24px">Click <strong style="color:#c9a84c">Apply Now</strong> in the popup to get everything — no re-downloading needed.</p>
 
-      <div style="background:#181818;border-left:3px solid #c9a84c;padding:14px 18px;margin-bottom:20px">
-        <p style="color:#c9a84c;font-size:12px;font-weight:700;letter-spacing:0.1em;margin:0 0 10px">WHAT'S NEW IN v${version}</p>
-        <ul style="color:#f0e6c8;font-size:13px;margin:0;padding-left:18px;line-height:1.8">
-          <li>Card number &amp; CVV now fill reliably on first visit (cold load)</li>
-          <li>Expiry date fills the instant the field appears — no more delays</li>
-          <li>Faster across the board — settlement time cut in half</li>
-          <li>Auto-update system — future updates apply with one click from the popup, no re-downloading</li>
-          <li>Supported sites expanded: Finish Line, JD Sports, Supreme, Kith, BAPE, Stussy, Palace + thousands of Shopify stores</li>
+      <div style="background:#181818;border-left:3px solid #c9a84c;padding:16px 20px;margin-bottom:18px">
+        <p style="color:#c9a84c;font-size:13px;font-weight:700;letter-spacing:0.08em;margin:0 0 12px">🏪 NEW: IN-STORE WAITLIST AUTO-BOOKING</p>
+        <p style="color:#f0e6c8;font-size:13px;line-height:1.6;margin:0 0 8px">Drop morning, skip the manual scramble. Finest now auto-books your Supreme in-store appointment on Waitwhile the second registration opens.</p>
+        <ul style="color:#c8bfaa;font-size:12px;margin:8px 0 0;padding-left:18px;line-height:1.7">
+          <li>Picks your preferred store automatically</li>
+          <li>Grabs the earliest available slot</li>
+          <li>Fills name, email, phone and hits submit</li>
+          <li>Auto-retries if a slot gets sniped — keeps going until you're in or the line closes</li>
+          <li>Supreme Brooklyn, Chicago, Manhattan, San Francisco, LA &amp; Miami</li>
+        </ul>
+        <p style="color:#7a6f56;font-size:11px;margin:12px 0 0;font-style:italic">Toggle on in Dashboard → Settings → Waitlist Auto-Booking. Pick your store and let it rip Tuesday morning.</p>
+      </div>
+
+      <div style="background:#181818;border-left:3px solid #c9a84c;padding:16px 20px;margin-bottom:24px">
+        <p style="color:#c9a84c;font-size:13px;font-weight:700;letter-spacing:0.08em;margin:0 0 12px">⚡ CHECKOUT IMPROVEMENTS</p>
+        <p style="color:#f0e6c8;font-size:13px;line-height:1.6;margin:0">Better fills, fewer hangs, and improved support across the sites you actually buy on:</p>
+        <ul style="color:#c8bfaa;font-size:12px;margin:8px 0 0;padding-left:18px;line-height:1.7">
+          <li><strong>Finish Line &amp; JD Sports</strong> — faster card/CVV fill on first visit</li>
+          <li><strong>Supreme (online)</strong> — dropdown crash fix on the new checkout</li>
+          <li><strong>Shopify-powered stores</strong> — Kith, BAPE, Stussy, Palace, Awake, Brain Dead, Pleasures, Carrots, Madhappy, Aimé Leon Dore, Bodega, Concepts, Extra Butter, Union LA, and thousands more</li>
+          <li><strong>SPA checkouts</strong> — Nike, JD now wait properly for fields to render before filling</li>
         </ul>
       </div>
 
-      <p style="color:#c8bfaa;font-size:13px;margin-bottom:20px">If you already have the extension installed, just click <strong style="color:#c9a84c">Apply Now</strong> in the popup — it'll update in seconds without re-downloading. Or grab the new zip below.</p>
-
-      <p style="margin:20px 0">
+      <p style="margin:24px 0 8px">
         <a href="${downloadUrl}" style="background:#c9a84c;color:#080808;padding:12px 28px;border-radius:5px;text-decoration:none;font-weight:700;font-family:monospace;font-size:14px">Download v${version}</a>
       </p>
-      <p style="color:#555;font-size:11px;margin-top:6px">Install: unzip → chrome://extensions → Developer Mode → Load unpacked → select folder</p>
+      <p style="color:#7a6f56;font-size:11px;margin:8px 0">
+        Already installed? Just click <strong style="color:#c9a84c">Apply Now</strong> in the popup. Re-download only if you're switching computers or installing fresh.
+      </p>
 
       <hr style="border:none;border-top:1px solid #1e1e1e;margin:28px 0"/>
       <p style="color:#3a3530;font-size:11px">Questions? Reply to this email.<br/>Finest Checkouts — Only the finest.</p>
@@ -753,7 +766,7 @@ app.post('/broadcast', async (req, res) => {
       const r = await fetch('https://api.resend.com/emails', {
         method:  'POST',
         headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: FROM_EMAIL, to: [email], subject: `Finest Checkouts v${version} — Major Update`, html }),
+        body: JSON.stringify({ from: FROM_EMAIL, to: [email], subject: `Finest Checkouts v${version} — In-store waitlist auto-booking + checkout upgrades`, html }),
       });
       if (r.ok) { sent++; console.log(`[Broadcast] Sent to ${email}`); }
       else { failed++; console.error(`[Broadcast] Failed ${email}:`, await r.text()); }
