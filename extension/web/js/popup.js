@@ -22,6 +22,14 @@ function cardType(cc) {
   return 'Card';
 }
 
+// Second-step "are you absolutely sure" body.
+const ABSOLUTELY_SURE_HTML = `
+  <p>Last chance, Timmy.</p>
+  <div class="modal-bigtext">NO TAKEBACKS</div>
+  <p>Click <strong>100% yes</strong> and Auto-Checkout is armed.</p>
+  <p>The next Supreme checkout page you load gets bought without asking again. Cart looking weird? Close this and fix it first.</p>
+`;
+
 // Auto-checkout enable warning. The .modal-bigtext element renders header-style.
 const AUTOCHECKOUT_WARNING_HTML = `
   <p>Do you even skate, bro?</p>
@@ -279,11 +287,21 @@ async function showApp(body) {
     await S.set({ settings: s });
   });
 
-  // ── Auto-Checkout (per active profile) ───────────────────────────────────
+  // ── Auto-Checkout (per active profile) — two-step confirm ────────────────
   document.getElementById('p-autoCheckout').addEventListener('change', async (e) => {
     if (e.target.checked) {
-      const ok = await areYouSure(AUTOCHECKOUT_WARNING_HTML);
-      if (!ok) { e.target.checked = false; return; }
+      const ok1 = await areYouSure({
+        title: 'ARE YOU SURE ABOUT THAT?',
+        html:  AUTOCHECKOUT_WARNING_HTML,
+        okText: 'Yeah I skate',
+      });
+      if (!ok1) { e.target.checked = false; return; }
+      const ok2 = await areYouSure({
+        title: 'ARE YOU ABSOLUTELY SURE?',
+        html:  ABSOLUTELY_SURE_HTML,
+        okText: '100% yes, let it rip',
+      });
+      if (!ok2) { e.target.checked = false; return; }
     }
     const d = await S.get(['profiles', 'activeProfile']);
     const profs = d.profiles || {};
@@ -293,15 +311,19 @@ async function showApp(body) {
     await S.set({ profiles: profs });
   });
 
-  // Custom confirm modal — replaces native confirm() so we can show an image
-  // and a big header-style line in the middle of the body.
-  function areYouSure(html) {
+  // Custom confirm modal — supports title, body HTML, and button labels.
+  function areYouSure(opts) {
+    const { html = '', title = 'ARE YOU SURE ABOUT THAT?', okText = 'OK', cancelText = 'Cancel' } = opts || {};
     return new Promise((resolve) => {
-      const modal = document.getElementById('ays-modal');
-      const body  = document.getElementById('ays-body');
-      const okBtn = document.getElementById('ays-ok');
-      const cxBtn = document.getElementById('ays-cancel');
+      const modal  = document.getElementById('ays-modal');
+      const titleEl= document.getElementById('ays-title');
+      const body   = document.getElementById('ays-body');
+      const okBtn  = document.getElementById('ays-ok');
+      const cxBtn  = document.getElementById('ays-cancel');
+      titleEl.textContent = title;
       body.innerHTML = html;
+      okBtn.textContent = okText;
+      cxBtn.textContent = cancelText;
       modal.hidden = false;
       const cleanup = (val) => {
         modal.hidden = true;

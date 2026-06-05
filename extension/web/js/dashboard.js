@@ -13,6 +13,14 @@ let profiles      = {};
 let activeProfile = null;
 let editingKey    = null;   // null = new profile
 
+// Second-step "are you absolutely sure" body.
+const ABSOLUTELY_SURE_HTML = `
+  <p>Last chance, Timmy.</p>
+  <div class="modal-bigtext">NO TAKEBACKS</div>
+  <p>Click <strong>100% yes</strong> and Auto-Checkout is armed.</p>
+  <p>The next Supreme checkout page you load gets bought without asking again. Cart looking weird? Close this and fix it first.</p>
+`;
+
 // Auto-checkout enable warning. The .modal-bigtext element renders header-style.
 const AUTOCHECKOUT_WARNING_HTML = `
   <p>Do you even skate, bro?</p>
@@ -303,7 +311,7 @@ async function init() {
   document.getElementById('f-autoCheckout').addEventListener('change', async (e) => {
     const warning = document.getElementById('autocheckout-warning');
     if (e.target.checked) {
-      const ok = await areYouSure(AUTOCHECKOUT_WARNING_HTML);
+      const ok = await confirmAutoCheckoutEnable();
       if (!ok) { e.target.checked = false; warning.style.display = 'none'; return; }
       warning.style.display = '';
     } else {
@@ -373,7 +381,7 @@ async function init() {
       return;
     }
     if (e.target.checked) {
-      const ok = await areYouSureDash(AUTOCHECKOUT_WARNING_HTML);
+      const ok = await confirmAutoCheckoutEnable();
       if (!ok) { e.target.checked = false; return; }
     }
     profiles[activeProfile].autoCheckout = e.target.checked;
@@ -406,14 +414,19 @@ function syncAutoCheckoutToggle() {
   if (nameEl) nameEl.textContent = `Active profile: ${p.profileName || activeProfile}`;
 }
 
-// Custom confirm modal — module-scope helper, used by the dashboard-level toggle
-function areYouSureDash(html) {
+// Custom confirm modal — supports title, body HTML, and button labels.
+function areYouSureDash(opts) {
+  const { html = '', title = 'ARE YOU SURE ABOUT THAT?', okText = 'OK', cancelText = 'Cancel' } = opts || {};
   return new Promise((resolve) => {
-    const modal = document.getElementById('ays-modal');
-    const body  = document.getElementById('ays-body');
-    const okBtn = document.getElementById('ays-ok');
-    const cxBtn = document.getElementById('ays-cancel');
+    const modal  = document.getElementById('ays-modal');
+    const titleEl= document.getElementById('ays-title');
+    const body   = document.getElementById('ays-body');
+    const okBtn  = document.getElementById('ays-ok');
+    const cxBtn  = document.getElementById('ays-cancel');
+    titleEl.textContent = title;
     body.innerHTML = html;
+    okBtn.textContent = okText;
+    cxBtn.textContent = cancelText;
     modal.hidden = false;
     const cleanup = (val) => {
       modal.hidden = true;
@@ -433,6 +446,22 @@ function areYouSureDash(html) {
     document.addEventListener('keydown', onKey);
     okBtn.focus();
   });
+}
+
+// Two-step confirmation used everywhere we arm Auto-Checkout
+async function confirmAutoCheckoutEnable() {
+  const ok1 = await areYouSureDash({
+    title: 'ARE YOU SURE ABOUT THAT?',
+    html:  AUTOCHECKOUT_WARNING_HTML,
+    okText: 'Yeah I skate',
+  });
+  if (!ok1) return false;
+  const ok2 = await areYouSureDash({
+    title: 'ARE YOU ABSOLUTELY SURE?',
+    html:  ABSOLUTELY_SURE_HTML,
+    okText: '100% yes, let it rip',
+  });
+  return ok2;
 }
 
 document.addEventListener('DOMContentLoaded', init);

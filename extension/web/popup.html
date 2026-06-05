@@ -316,42 +316,60 @@
       background: rgba(0, 0, 0, 0.82);
       z-index: 9999;
       display: flex; align-items: center; justify-content: center;
-      padding: 8px;
+      padding: 6px;
+      box-sizing: border-box;
     }
     .modal-backdrop[hidden] { display: none; }
     .modal-card {
       background: var(--bg-1);
       border: 1px solid var(--gold-dim);
       border-radius: 6px;
-      padding: 18px 16px 14px;
-      text-align: center;
-      max-width: 280px;
+      width: 286px;
+      max-width: calc(100vw - 12px);
+      max-height: calc(100vh - 12px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
       box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+      box-sizing: border-box;
+    }
+    .modal-image-area {
+      background: #00C040;
+      padding: 14px 14px 12px;
+      text-align: center;
+      flex-shrink: 0;
     }
     .modal-img {
-      max-width: 130px;
-      max-height: 130px;
-      margin: 0 auto 10px;
-      border-radius: 5px;
+      max-width: 100%;
+      max-height: 150px;
+      width: auto;
+      height: auto;
+      margin: 0 auto 8px;
       display: block;
+      object-fit: contain;
     }
     .modal-title {
       font-family: var(--display);
       font-size: 14px;
       font-weight: 800;
       letter-spacing: 0.06em;
-      color: var(--gold);
-      margin-bottom: 10px;
+      color: #fff;
+      margin: 0;
+      line-height: 1.2;
     }
     .modal-body {
       font-size: 11px;
       line-height: 1.5;
       color: var(--text);
       text-align: left;
-      margin-bottom: 14px;
-      max-height: 260px;
+      padding: 14px;
+      flex: 1 1 auto;
       overflow-y: auto;
-      padding-right: 4px;
+      overflow-x: hidden;
+      min-height: 0;
+      box-sizing: border-box;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
     .modal-body p { margin-bottom: 8px; }
     .modal-body p:last-child { margin-bottom: 0; }
@@ -360,22 +378,31 @@
     .modal-bigtext {
       font-family: var(--display);
       font-weight: 800;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.03em;
       color: var(--gold);
       text-align: center;
       margin: 10px 0;
-      font-size: clamp(15px, 7vw, 19px);
-      line-height: 1.1;
-      white-space: nowrap;
+      font-size: 17px;
+      line-height: 1.15;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
     .modal-body::-webkit-scrollbar { width: 3px; }
     .modal-body::-webkit-scrollbar-thumb { background: var(--bg-3); }
-    .modal-actions { display: flex; gap: 6px; justify-content: center; }
+    .modal-actions {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      padding: 10px 14px 12px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      background: var(--bg-1);
+    }
     .btn-modal-confirm, .btn-modal-cancel {
       font-family: var(--mono);
       font-size: 11px;
       font-weight: 600;
-      padding: 7px 14px;
+      padding: 8px 14px;
       border-radius: 4px;
       cursor: pointer;
       letter-spacing: 0.03em;
@@ -578,11 +605,13 @@
 
 <div id="popup-body"></div>
 
-<!-- Custom confirm modal — supports an image, fallback to text-only -->
+<!-- Custom confirm modal -->
 <div class="modal-backdrop" id="ays-modal" hidden>
   <div class="modal-card">
-    <img class="modal-img" src="images/are-you-sure.png" alt="" onerror="this.style.display='none'"/>
-    <div class="modal-title">ARE YOU SURE ABOUT THAT?</div>
+    <div class="modal-image-area">
+      <img class="modal-img" id="ays-img" src="images/are-you-sure.png" alt="" onerror="this.style.display='none'"/>
+      <div class="modal-title" id="ays-title">ARE YOU SURE ABOUT THAT?</div>
+    </div>
     <div class="modal-body" id="ays-body"></div>
     <div class="modal-actions">
       <button class="btn-modal-cancel" id="ays-cancel">Cancel</button>
