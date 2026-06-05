@@ -449,6 +449,68 @@ html, body {
 }
 .setting-select:focus { border-color: var(--gold-dim); }
 
+/* ── Waitlist section on the Profiles page ── */
+.waitlist-section {
+  margin-top: 28px;
+  padding: 18px 20px;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  border-left: 3px solid var(--gold);
+}
+.waitlist-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.waitlist-icon {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.waitlist-titles { flex: 1; min-width: 0; }
+.waitlist-title {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+.waitlist-desc {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.waitlist-store-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.waitlist-store-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+.waitlist-store-select {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+  min-width: 200px;
+  outline: none;
+}
+.waitlist-store-select:focus { border-color: var(--gold-dim); }
+
 /* ── Toast ── */
 .toast {
   position: fixed;

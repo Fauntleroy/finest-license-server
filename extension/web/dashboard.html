@@ -57,6 +57,33 @@
         <p>No profiles yet.</p>
         <button class="btn-primary" id="btn-new-profile-empty">Create your first profile</button>
       </div>
+
+      <!-- Supreme Waitlist Auto-Booking — inline on the main dashboard page -->
+      <div class="waitlist-section" id="waitlist-section">
+        <div class="waitlist-header">
+          <div class="waitlist-icon">🏪</div>
+          <div class="waitlist-titles">
+            <div class="waitlist-title">Supreme Waitlist Auto-Booking</div>
+            <div class="waitlist-desc">Hands-free Waitwhile registration on Tuesdays. Picks the earliest available slot at your store and submits using your active profile.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="s-waitlistAutoBook">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="waitlist-store-row">
+          <label for="s-waitlistStore" class="waitlist-store-label">Preferred Supreme Store</label>
+          <select id="s-waitlistStore" class="waitlist-store-select">
+            <option value="">— Select a store —</option>
+            <option value="supreme-brooklyn">Brooklyn</option>
+            <option value="supreme-chicago">Chicago</option>
+            <option value="supreme-newyork">Manhattan</option>
+            <option value="supreme-sanfrancisco">San Francisco</option>
+            <option value="supreme-losangeles">Los Angeles</option>
+            <option value="suprememiami">Miami</option>
+          </select>
+        </div>
+      </div>
     </section>
 
     <!-- EDITOR VIEW -->
@@ -167,32 +194,9 @@
           </label>
         </div>
 
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Supreme Waitlist Auto-Booking</div>
-            <div class="setting-desc">Hands-free Waitwhile registration. Picks earliest time slot and submits with your active profile (name, email, phone). Only runs on waitwhile.com.</div>
-          </div>
-          <label class="toggle">
-            <input type="checkbox" id="s-waitlistAutoBook">
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">Preferred Supreme Store</div>
-            <div class="setting-desc">Which location to register at when auto-booking is on</div>
-          </div>
-          <select id="s-waitlistStore" class="setting-select">
-            <option value="">— Select store —</option>
-            <option value="supreme-brooklyn">Brooklyn</option>
-            <option value="supreme-chicago">Chicago</option>
-            <option value="supreme-newyork">Manhattan</option>
-            <option value="supreme-sanfrancisco">San Francisco</option>
-            <option value="supreme-losangeles">Los Angeles</option>
-            <option value="suprememiami">Miami</option>
-          </select>
-        </div>
+        <p style="color:#7a6f56;font-size:11px;margin-top:18px;text-align:center">
+          Looking for Supreme Waitlist Auto-Booking? It's now on the Profiles page so you can find it faster.
+        </p>
       </div>
     </section>
 

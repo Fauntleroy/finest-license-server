@@ -40,6 +40,10 @@ function renderProfiles() {
 
   grid.innerHTML = '';
 
+  // Show the waitlist section only when at least one profile exists
+  const waitlistEl = document.getElementById('waitlist-section');
+  if (waitlistEl) waitlistEl.style.display = keys.length === 0 ? 'none' : '';
+
   if (keys.length === 0) {
     empty.classList.add('visible');
     return;
