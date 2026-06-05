@@ -478,7 +478,7 @@ html, body {
 }
 .modal-image-area {
   background: #00C040;
-  padding: 22px 24px 18px;
+  padding: 14px 20px 12px;
   text-align: center;
   flex-shrink: 0;
 }
@@ -488,16 +488,16 @@ html, body {
 }
 .modal-img {
   max-width: 100%;
-  max-height: 220px;
+  max-height: 140px;
   width: auto;
   height: auto;
-  margin: 0 auto 14px;
+  margin: 0 auto 10px;
   display: block;
   object-fit: contain;
 }
 .modal-title {
   font-family: var(--display);
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 800;
   letter-spacing: 0.08em;
   color: #fff;
