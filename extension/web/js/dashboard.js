@@ -26,7 +26,6 @@ const STEP_THEN_I_WONT_HTML = `
 const STEP_WTF_HTML = `
   <p>Wow.</p>
   <div class="modal-bigtext">WTF IS WRONG WITH YOU?</div>
-  <p>That escalated fast.</p>
 `;
 const STEP_FINAL_HTML = `
   <p>You know what? I hope you DO buy some dumb crap.</p>
