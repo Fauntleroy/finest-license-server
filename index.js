@@ -408,7 +408,7 @@ app.get('/auth/discord', (req, res) => {
     client_id:     DISCORD_CLIENT_ID,
     redirect_uri:  `${SERVER_URL}/auth/discord/callback`,
     response_type: 'code',
-    scope:         'identify',
+    scope:         'identify email',
     state,
   });
   res.redirect(`https://discord.com/oauth2/authorize?${params}`);
@@ -453,12 +453,16 @@ app.get('/auth/discord/callback', async (req, res) => {
       return res.redirect(`/?key=${encodeURIComponent(existing[0])}&returning=1`);
     }
 
-    // Issue new key
+    // Issue new key.
+    // Discord returns user.email when the 'email' scope is granted. If for any
+    // reason it's missing or the user hides it, fall back to the username and
+    // give them the chance to add an email later via /add-email.
+    const realEmail = user.email && user.email.includes('@') ? user.email : null;
     const newKey  = generateKey();
     const today   = new Date();
     keys[newKey]  = {
       status:        'active',
-      email:         user.username,
+      email:         realEmail || user.username,
       discordUserId: user.id,
       discordTag:    user.discriminator ? `${user.username}#${user.discriminator}` : user.username,
       source:        'discord',
@@ -467,10 +471,12 @@ app.get('/auth/discord/callback', async (req, res) => {
       createdAt:     today.toISOString(),
       lastChecked:   today.toISOString(),
       lastSeen:      null,
+      ...(realEmail && { emailSent: false }),
     };
     saveKeys(keys);
-    console.log(`[Discord] New key for ${user.username} (${user.id}) via "${roleName}": ${newKey}`);
+    console.log(`[Discord] New key for ${user.username} (${user.id}) via "${roleName}": ${newKey}${realEmail ? ' — emailing ' + realEmail : ' (no email captured)'}`);
     assignMemberRole(user.id);
+    if (realEmail) sendKeyEmailTracked(realEmail, newKey);
     return res.redirect(`/?key=${encodeURIComponent(newKey)}`);
 
   } catch (err) {
@@ -792,6 +798,97 @@ app.post('/recover', async (req, res) => {
     console.log(`[Recover] Resent ${key} to ${email}`);
   }
   return res.json(genericResponse);
+});
+
+// ─────────────────────────────────────────────
+// POST /add-email — user-facing endpoint to attach an email to their key
+// Used primarily by Discord users (whose key was issued before email scope)
+// to receive update broadcasts going forward.
+// ─────────────────────────────────────────────
+app.post('/add-email', async (req, res) => {
+  const key   = (req.body?.key   || '').trim().toUpperCase();
+  const email = (req.body?.email || '').trim().toLowerCase();
+  if (!key || !key.startsWith('FINEST-')) {
+    return res.json({ error: 'Please enter a valid licence key.' });
+  }
+  if (!email || !email.includes('@') || email.length > 200) {
+    return res.json({ error: 'Please enter a valid email address.' });
+  }
+  const keys = loadKeys();
+  const record = keys[key];
+  if (!record) {
+    return res.json({ error: 'Licence key not found.' });
+  }
+  if (record.status !== 'active') {
+    return res.json({ error: 'This licence key is not active.' });
+  }
+  record.email = email;
+  record.emailSent = false; // queue a fresh send so they get the key by email too
+  saveKeys(keys);
+  console.log(`[Add-Email] ${key} → ${email}`);
+  // Send them their key for confirmation
+  await sendKeyEmailTracked(email, key);
+  return res.json({ ok: true, message: 'Email added! Check your inbox for a confirmation.' });
+});
+
+// ─────────────────────────────────────────────
+// GET /add-email — user-facing page
+// ─────────────────────────────────────────────
+app.get('/add-email', (req, res) => {
+  res.send(`<!DOCTYPE html><html><head><title>Add Email to Your Finest Checkouts Licence</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:#080808;color:#f0e6c8;font-family:monospace;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+    .card{max-width:440px;width:100%;text-align:center;}
+    .brand{color:#c9a84c;font-size:18px;font-weight:800;letter-spacing:0.1em;margin-bottom:8px;}
+    .sub{color:#7a6f56;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:28px;}
+    p{font-size:13px;line-height:1.6;margin-bottom:24px;color:#c8bfaa;}
+    input{background:#181818;border:1px solid #252525;border-radius:5px;color:#f0e6c8;font-family:monospace;font-size:13px;padding:12px 14px;width:100%;outline:none;margin-bottom:10px;text-align:center;}
+    input:focus{border-color:#7a5e1e;}
+    button{background:#c9a84c;border:none;border-radius:5px;color:#080808;font-family:monospace;font-size:13px;font-weight:700;padding:12px 24px;width:100%;cursor:pointer;letter-spacing:0.04em;margin-top:4px;}
+    button:hover:not(:disabled){background:#e4be6a;}
+    button:disabled{background:#252525;color:#555;cursor:default;}
+    .msg{font-size:12px;margin-top:16px;min-height:18px;color:#7ec98a;}
+    .err{color:#c06060;}
+    .hint{color:#7a6f56;font-size:11px;margin-top:18px;line-height:1.5;}
+  </style></head>
+  <body>
+    <div class="card">
+      <div class="brand">FINEST CHECKOUTS</div>
+      <div class="sub">Add Email to Licence</div>
+      <p>Got your licence through Discord? Add your email here so you don't miss future updates and your key arrives in your inbox.</p>
+      <form id="f">
+        <input id="k" type="text" placeholder="FINEST-XXXX-XXXX-XXXX" autocomplete="off" required style="letter-spacing:0.06em;text-transform:uppercase"/>
+        <input id="e" type="email" placeholder="your@email.com" required/>
+        <button type="submit" id="b">Save Email</button>
+      </form>
+      <div class="msg" id="m"></div>
+      <div class="hint">We use this only to send you update announcements and to let you recover a lost key. Nothing else.</div>
+    </div>
+    <script>
+      const f = document.getElementById('f');
+      const b = document.getElementById('b');
+      const m = document.getElementById('m');
+      f.onsubmit = async (ev) => {
+        ev.preventDefault();
+        b.disabled = true; b.textContent = 'Saving...';
+        m.textContent = ''; m.classList.remove('err');
+        try {
+          const r = await fetch('/add-email', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+            key: document.getElementById('k').value,
+            email: document.getElementById('e').value
+          }) });
+          const d = await r.json();
+          if (d.error) { m.textContent = d.error; m.classList.add('err'); }
+          else { m.textContent = d.message || 'Saved.'; f.reset(); }
+        } catch (err) {
+          m.textContent = 'Something went wrong. Please try again.'; m.classList.add('err');
+        } finally {
+          b.disabled = false; b.textContent = 'Save Email';
+        }
+      };
+    </script>
+  </body></html>`);
 });
 
 // ─────────────────────────────────────────────
