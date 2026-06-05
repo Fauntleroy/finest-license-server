@@ -310,6 +310,75 @@
       letter-spacing: 0.02em;
     }
 
+    /* ── Are You Sure modal (popup-sized) ── */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.82);
+      z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      padding: 8px;
+    }
+    .modal-backdrop[hidden] { display: none; }
+    .modal-card {
+      background: var(--bg-1);
+      border: 1px solid var(--gold-dim);
+      border-radius: 6px;
+      padding: 18px 16px 14px;
+      text-align: center;
+      max-width: 280px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+    }
+    .modal-img {
+      max-width: 130px;
+      max-height: 130px;
+      margin: 0 auto 10px;
+      border-radius: 5px;
+      display: block;
+    }
+    .modal-title {
+      font-family: var(--display);
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      color: var(--gold);
+      margin-bottom: 10px;
+    }
+    .modal-body {
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--text);
+      text-align: left;
+      white-space: pre-wrap;
+      margin-bottom: 14px;
+      max-height: 220px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .modal-body::-webkit-scrollbar { width: 3px; }
+    .modal-body::-webkit-scrollbar-thumb { background: var(--bg-3); }
+    .modal-actions { display: flex; gap: 6px; justify-content: center; }
+    .btn-modal-confirm, .btn-modal-cancel {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 7px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+    }
+    .btn-modal-confirm {
+      background: var(--gold);
+      border: 1px solid var(--gold);
+      color: #080808;
+    }
+    .btn-modal-confirm:hover { background: var(--gold-hi); }
+    .btn-modal-cancel {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+    }
+    .btn-modal-cancel:hover { border-color: var(--gold-dim); color: var(--text); }
+
     /* ── Shared ── */
     .btn-primary {
       background: var(--gold);
@@ -494,6 +563,19 @@
 <div class="gold-line"></div>
 
 <div id="popup-body"></div>
+
+<!-- Custom confirm modal — supports an image, fallback to text-only -->
+<div class="modal-backdrop" id="ays-modal" hidden>
+  <div class="modal-card">
+    <img class="modal-img" src="images/are-you-sure.png" alt="" onerror="this.style.display='none'"/>
+    <div class="modal-title">ARE YOU SURE ABOUT THAT?</div>
+    <div class="modal-body" id="ays-body"></div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" id="ays-cancel">Cancel</button>
+      <button class="btn-modal-confirm" id="ays-ok">Yeah I skate</button>
+    </div>
+  </div>
+</div>
 
 <script src="js/license.js"></script>
 <script src="js/popup.js"></script>

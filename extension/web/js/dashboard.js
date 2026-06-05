@@ -277,18 +277,16 @@ async function init() {
   document.getElementById('btn-delete-profile').addEventListener('click', deleteProfile);
 
   // Auto-checkout — show big funny warning when enabling, allow easy disable
-  document.getElementById('f-autoCheckout').addEventListener('change', (e) => {
+  document.getElementById('f-autoCheckout').addEventListener('change', async (e) => {
     const warning = document.getElementById('autocheckout-warning');
     if (e.target.checked) {
-      const ok = confirm(
-        '🛹 HOLD UP TIMMY\n\n' +
-        'Do you even skate, bor?\n\n' +
-        "Cause the second you flip this on, the next Supreme checkout page you load is gonna get the pay button SLAMMED — no asking, no 'are you sure', no review your cart moment. Real card. Real charge. Real Timmy moment.\n\n" +
-        '• Wrong size in cart? Your problem.\n' +
-        '• Forgot to turn this off from yesterday? Your problem.\n' +
-        '• Wife checks the credit card statement? Your problem (Timmy).\n\n' +
-        'Auto-Checkout turns itself OFF after every order so you don\'t double-buy. But it\'s on you to flip it on at the right second.\n\n' +
-        'Hit OK if you actually skate. Cancel if you got scared.'
+      const ok = await areYouSure(
+        "Do you even skate, bor?\n\n" +
+        "Flip this on and the next Supreme checkout page you load gets the pay button SLAMMED — no asking, no 'are you sure', no review your cart moment. Real card. Real charge. Real Timmy moment.\n\n" +
+        "• Wrong size in cart? Your problem.\n" +
+        "• Forgot to turn this off from yesterday? Your problem.\n" +
+        "• Wife checks the credit card statement? Your problem (Timmy).\n\n" +
+        "Auto-Checkout turns itself OFF after every order so you don't double-buy. But it's on you to flip it on at the right second."
       );
       if (!ok) { e.target.checked = false; warning.style.display = 'none'; return; }
       warning.style.display = '';
@@ -296,6 +294,35 @@ async function init() {
       warning.style.display = 'none';
     }
   });
+
+  // ── Custom confirm modal (replaces native confirm() for image + style) ────
+  function areYouSure(message) {
+    return new Promise((resolve) => {
+      const modal  = document.getElementById('ays-modal');
+      const body   = document.getElementById('ays-body');
+      const okBtn  = document.getElementById('ays-ok');
+      const cxBtn  = document.getElementById('ays-cancel');
+      body.textContent = message;
+      modal.hidden = false;
+      const cleanup = (val) => {
+        modal.hidden = true;
+        okBtn.removeEventListener('click', onOk);
+        cxBtn.removeEventListener('click', onCx);
+        document.removeEventListener('keydown', onKey);
+        resolve(val);
+      };
+      const onOk  = () => cleanup(true);
+      const onCx  = () => cleanup(false);
+      const onKey = (ev) => {
+        if (ev.key === 'Escape') cleanup(false);
+        if (ev.key === 'Enter')  cleanup(true);
+      };
+      okBtn.addEventListener('click', onOk);
+      cxBtn.addEventListener('click', onCx);
+      document.addEventListener('keydown', onKey);
+      okBtn.focus();
+    });
+  }
 
   // CC auto-format — track cursor by digit count so spaces don't shift it
   document.getElementById('f-CC').addEventListener('input', (e) => {

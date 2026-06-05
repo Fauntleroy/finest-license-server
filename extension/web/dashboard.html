@@ -211,6 +211,19 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- Custom confirm modal — replaces native confirm() so we can use an image -->
+<div class="modal-backdrop" id="ays-modal" hidden>
+  <div class="modal-card">
+    <img class="modal-img" src="images/are-you-sure.png" alt="" onerror="this.style.display='none'"/>
+    <div class="modal-title">ARE YOU SURE ABOUT THAT?</div>
+    <div class="modal-body" id="ays-body"></div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" id="ays-cancel">Cancel</button>
+      <button class="btn-modal-confirm" id="ays-ok">Yeah I skate</button>
+    </div>
+  </div>
+</div>
+
 <script src="js/license.js"></script>
 <script src="js/dashboard.js"></script>
 </body>

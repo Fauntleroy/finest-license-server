@@ -449,6 +449,88 @@ html, body {
 }
 .setting-select:focus { border-color: var(--gold-dim); }
 
+/* ── Custom "ARE YOU SURE ABOUT THAT?" modal ── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.modal-backdrop[hidden] { display: none; }
+.modal-card {
+  background: var(--bg-1);
+  border: 1px solid var(--gold-dim);
+  border-radius: var(--radius);
+  max-width: 460px;
+  width: 100%;
+  padding: 28px 28px 22px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 80px rgba(201, 168, 76, 0.08);
+  animation: modalIn 0.18s ease-out;
+}
+@keyframes modalIn {
+  from { transform: translateY(8px) scale(0.97); opacity: 0; }
+  to   { transform: translateY(0)    scale(1);    opacity: 1; }
+}
+.modal-img {
+  max-width: 180px;
+  max-height: 180px;
+  margin: 0 auto 14px;
+  border-radius: 6px;
+  display: block;
+}
+.modal-title {
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+  margin-bottom: 14px;
+}
+.modal-body {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  text-align: left;
+  white-space: pre-wrap;
+  margin-bottom: 22px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.modal-body::-webkit-scrollbar { width: 4px; }
+.modal-body::-webkit-scrollbar-thumb { background: var(--bg-3); }
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.btn-modal-confirm, .btn-modal-cancel {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: 5px;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+.btn-modal-confirm {
+  background: var(--gold);
+  border: 1px solid var(--gold);
+  color: #080808;
+}
+.btn-modal-confirm:hover { background: var(--gold-hi); }
+.btn-modal-cancel {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.btn-modal-cancel:hover { border-color: var(--gold-dim); color: var(--text); }
+
 /* ── BETA disclaimer banner ── */
 .beta-banner {
   margin-top: 24px;
