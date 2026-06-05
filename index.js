@@ -872,11 +872,37 @@ app.post('/broadcast', async (req, res) => {
         </ul>
       </div>
 
+      <div style="background:#1a1400;border:1px solid #7a5e1e;border-radius:6px;padding:14px 18px;margin-bottom:20px">
+        <p style="color:#c9a84c;font-size:12px;font-weight:700;letter-spacing:0.08em;margin:0 0 8px">⚠ RUNNING v2.1 OR EARLIER? READ THIS</p>
+        <p style="color:#e8c878;font-size:12px;line-height:1.6;margin:0">
+          One-time re-install required. v2.1 didn't have the auto-update system, so you'll need to download the new zip below and load it fresh. After this, future updates (like the next checkout improvement or supported site) apply with a single <strong>Apply Now</strong> click in the popup — no more re-installs.
+        </p>
+      </div>
+
       <p style="margin:24px 0 8px">
         <a href="${downloadUrl}" style="background:#c9a84c;color:#080808;padding:12px 28px;border-radius:5px;text-decoration:none;font-weight:700;font-family:monospace;font-size:14px">Download v${version}</a>
       </p>
-      <p style="color:#7a6f56;font-size:11px;margin:8px 0">
-        Already installed? Just click <strong style="color:#c9a84c">Apply Now</strong> in the popup. Re-download only if you're switching computers or installing fresh.
+      <p style="color:#7a6f56;font-size:11px;margin:8px 0 24px">
+        On v2.2.0+? Just click <strong style="color:#c9a84c">Apply Now</strong> in the popup. Re-download only if you're switching computers, installing fresh, or want the in-store waitlist feature.
+      </p>
+
+      <div style="background:#181818;border-radius:6px;padding:16px 20px;margin-bottom:24px">
+        <p style="color:#c9a84c;font-size:12px;font-weight:700;letter-spacing:0.08em;margin:0 0 12px">📦 INSTALL INSTRUCTIONS</p>
+        <ol style="color:#c8bfaa;font-size:12px;margin:0;padding-left:20px;line-height:1.9">
+          <li>Click <strong style="color:#f0e6c8">Download v${version}</strong> above to grab the zip</li>
+          <li>Unzip the file to a folder you'll remember (Desktop is fine)</li>
+          <li>Open Chrome and go to <strong style="color:#f0e6c8">chrome://extensions</strong></li>
+          <li>If you have an old version installed, click <strong style="color:#f0e6c8">Remove</strong> on it first</li>
+          <li>Toggle <strong style="color:#f0e6c8">Developer Mode</strong> ON (top-right corner)</li>
+          <li>Click <strong style="color:#f0e6c8">Load Unpacked</strong> (top-left)</li>
+          <li>Select the unzipped folder you saved in step 2</li>
+          <li>Click the Finest extension icon → enter your licence key → done</li>
+        </ol>
+        <p style="color:#7a6f56;font-size:11px;margin:12px 0 0;font-style:italic">Your profiles are stored in Chrome, not in the extension files — re-installing won't erase them. They'll come right back once you enter your key.</p>
+      </div>
+
+      <p style="color:#7a6f56;font-size:11px;margin:0">
+        Lost your licence key? <a href="https://finest-license-server-production.up.railway.app/recover" style="color:#c9a84c;text-decoration:underline">Recover it here</a>.
       </p>
 
       <hr style="border:none;border-top:1px solid #1e1e1e;margin:28px 0"/>
