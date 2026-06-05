@@ -476,8 +476,13 @@ app.get('/auth/discord/callback', async (req, res) => {
     saveKeys(keys);
     console.log(`[Discord] New key for ${user.username} (${user.id}) via "${roleName}": ${newKey}${realEmail ? ' — emailing ' + realEmail : ' (no email captured)'}`);
     assignMemberRole(user.id);
-    if (realEmail) sendKeyEmailTracked(realEmail, newKey);
-    return res.redirect(`/?key=${encodeURIComponent(newKey)}`);
+    if (realEmail) {
+      sendKeyEmailTracked(realEmail, newKey);
+      return res.redirect(`/?key=${encodeURIComponent(newKey)}`);
+    }
+    // No email captured (user denied scope or hid email) — send them to the
+    // add-email form with their key pre-filled so we can still reach them.
+    return res.redirect(`/add-email?key=${encodeURIComponent(newKey)}&from=discord`);
 
   } catch (err) {
     console.error('[Discord OAuth]', err.message);
@@ -835,6 +840,15 @@ app.post('/add-email', async (req, res) => {
 // GET /add-email — user-facing page
 // ─────────────────────────────────────────────
 app.get('/add-email', (req, res) => {
+  const prefilledKey = (req.query.key || '').toString().replace(/[^A-Za-z0-9-]/g, '').slice(0, 24);
+  const fromDiscord  = req.query.from === 'discord';
+
+  const subtitle = fromDiscord ? 'One more step' : 'Add Email to Licence';
+  const blurb = fromDiscord
+    ? `<p style="color:#f0e6c8;font-size:14px;font-weight:600;margin-bottom:8px">✅ Your licence is ready — almost done.</p>
+       <p>Discord didn't share your email with us. Add one now so we can send the key to your inbox and let you know when updates drop. Your key is pre-filled below.</p>`
+    : `<p>Got your licence through Discord? Add your email here so you don't miss future updates and your key arrives in your inbox.</p>`;
+
   res.send(`<!DOCTYPE html><html><head><title>Add Email to Your Finest Checkouts Licence</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;}
@@ -842,26 +856,33 @@ app.get('/add-email', (req, res) => {
     .card{max-width:440px;width:100%;text-align:center;}
     .brand{color:#c9a84c;font-size:18px;font-weight:800;letter-spacing:0.1em;margin-bottom:8px;}
     .sub{color:#7a6f56;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:28px;}
-    p{font-size:13px;line-height:1.6;margin-bottom:24px;color:#c8bfaa;}
+    p{font-size:13px;line-height:1.6;margin-bottom:16px;color:#c8bfaa;}
     input{background:#181818;border:1px solid #252525;border-radius:5px;color:#f0e6c8;font-family:monospace;font-size:13px;padding:12px 14px;width:100%;outline:none;margin-bottom:10px;text-align:center;}
     input:focus{border-color:#7a5e1e;}
-    button{background:#c9a84c;border:none;border-radius:5px;color:#080808;font-family:monospace;font-size:13px;font-weight:700;padding:12px 24px;width:100%;cursor:pointer;letter-spacing:0.04em;margin-top:4px;}
+    input[readonly]{background:#101010;color:#c9a84c;cursor:default;}
+    button{background:#c9a84c;border:none;border-radius:5px;color:#080808;font-family:monospace;font-size:13px;font-weight:700;padding:12px 24px;width:100%;cursor:pointer;letter-spacing:0.04em;margin-top:8px;}
     button:hover:not(:disabled){background:#e4be6a;}
     button:disabled{background:#252525;color:#555;cursor:default;}
+    .skip{display:block;margin-top:14px;font-size:11px;color:#7a6f56;text-decoration:none;}
+    .skip:hover{color:#c9a84c;}
     .msg{font-size:12px;margin-top:16px;min-height:18px;color:#7ec98a;}
     .err{color:#c06060;}
     .hint{color:#7a6f56;font-size:11px;margin-top:18px;line-height:1.5;}
+    .label{display:block;font-size:10px;color:#7a6f56;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:4px;text-align:left;}
   </style></head>
   <body>
     <div class="card">
       <div class="brand">FINEST CHECKOUTS</div>
-      <div class="sub">Add Email to Licence</div>
-      <p>Got your licence through Discord? Add your email here so you don't miss future updates and your key arrives in your inbox.</p>
+      <div class="sub">${subtitle}</div>
+      ${blurb}
       <form id="f">
-        <input id="k" type="text" placeholder="FINEST-XXXX-XXXX-XXXX" autocomplete="off" required style="letter-spacing:0.06em;text-transform:uppercase"/>
-        <input id="e" type="email" placeholder="your@email.com" required/>
-        <button type="submit" id="b">Save Email</button>
+        ${prefilledKey ? '<span class="label">Your Licence Key</span>' : ''}
+        <input id="k" type="text" placeholder="FINEST-XXXX-XXXX-XXXX" autocomplete="off" required style="letter-spacing:0.06em;text-transform:uppercase" value="${prefilledKey}" ${prefilledKey ? 'readonly' : ''}/>
+        ${prefilledKey ? '<span class="label" style="margin-top:8px">Your Email</span>' : ''}
+        <input id="e" type="email" placeholder="your@email.com" autofocus required/>
+        <button type="submit" id="b">${fromDiscord ? 'Save & Send Me My Key' : 'Save Email'}</button>
       </form>
+      ${fromDiscord && prefilledKey ? `<a class="skip" href="/?key=${encodeURIComponent(prefilledKey)}&returning=1">Skip — I'll add an email later</a>` : ''}
       <div class="msg" id="m"></div>
       <div class="hint">We use this only to send you update announcements and to let you recover a lost key. Nothing else.</div>
     </div>
@@ -869,22 +890,30 @@ app.get('/add-email', (req, res) => {
       const f = document.getElementById('f');
       const b = document.getElementById('b');
       const m = document.getElementById('m');
+      const prefilled = ${prefilledKey ? 'true' : 'false'};
       f.onsubmit = async (ev) => {
         ev.preventDefault();
         b.disabled = true; b.textContent = 'Saving...';
         m.textContent = ''; m.classList.remove('err');
         try {
+          const keyVal = document.getElementById('k').value;
           const r = await fetch('/add-email', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
-            key: document.getElementById('k').value,
+            key: keyVal,
             email: document.getElementById('e').value
           }) });
           const d = await r.json();
-          if (d.error) { m.textContent = d.error; m.classList.add('err'); }
-          else { m.textContent = d.message || 'Saved.'; f.reset(); }
+          if (d.error) { m.textContent = d.error; m.classList.add('err'); b.disabled = false; b.textContent = '${fromDiscord ? 'Save & Send Me My Key' : 'Save Email'}'; return; }
+          m.textContent = d.message || 'Saved.';
+          // If key was pre-filled (Discord flow), redirect to the portal so they see their key
+          if (prefilled) {
+            setTimeout(() => { window.location.href = '/?key=' + encodeURIComponent(keyVal) + '&returning=1'; }, 1500);
+          } else {
+            f.reset();
+            b.disabled = false; b.textContent = 'Save Email';
+          }
         } catch (err) {
           m.textContent = 'Something went wrong. Please try again.'; m.classList.add('err');
-        } finally {
-          b.disabled = false; b.textContent = 'Save Email';
+          b.disabled = false; b.textContent = '${fromDiscord ? 'Save & Send Me My Key' : 'Save Email'}';
         }
       };
     </script>
