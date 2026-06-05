@@ -276,18 +276,19 @@ async function init() {
   document.getElementById('btn-save-profile').addEventListener('click', saveProfile);
   document.getElementById('btn-delete-profile').addEventListener('click', deleteProfile);
 
-  // Auto-checkout — show big warning when enabling, allow easy disable
+  // Auto-checkout — show big funny warning when enabling, allow easy disable
   document.getElementById('f-autoCheckout').addEventListener('change', (e) => {
     const warning = document.getElementById('autocheckout-warning');
     if (e.target.checked) {
       const ok = confirm(
-        '⚠ AUTO-CHECKOUT WILL PLACE REAL ORDERS\n\n' +
-        'When this profile is active and you load a Supreme checkout page, ' +
-        'the extension will fill your info AND CLICK SUBMIT — completing the purchase ' +
-        'with no further confirmation.\n\n' +
-        'You will spend real money the moment a checkout page loads. ' +
-        'Use this only when you are 100% sure you want to buy whatever is in your cart.\n\n' +
-        'Click OK to enable. Click Cancel to keep it off.'
+        '🛹 HOLD UP TIMMY\n\n' +
+        'Do you even skate, bor?\n\n' +
+        "Cause the second you flip this on, the next Supreme checkout page you load is gonna get the pay button SLAMMED — no asking, no 'are you sure', no review your cart moment. Real card. Real charge. Real Timmy moment.\n\n" +
+        '• Wrong size in cart? Your problem.\n' +
+        '• Forgot to turn this off from yesterday? Your problem.\n' +
+        '• Wife checks the credit card statement? Your problem (Timmy).\n\n' +
+        'Auto-Checkout turns itself OFF after every order so you don\'t double-buy. But it\'s on you to flip it on at the right second.\n\n' +
+        'Hit OK if you actually skate. Cancel if you got scared.'
       );
       if (!ok) { e.target.checked = false; warning.style.display = 'none'; return; }
       warning.style.display = '';

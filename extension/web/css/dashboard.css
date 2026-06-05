@@ -449,6 +449,32 @@ html, body {
 }
 .setting-select:focus { border-color: var(--gold-dim); }
 
+/* ── BETA disclaimer banner ── */
+.beta-banner {
+  margin-top: 24px;
+  padding: 12px 16px;
+  background: #1a0a0a;
+  border: 1px solid #4a1010;
+  border-radius: var(--radius);
+  color: #d8a8a8;
+  font-size: 11px;
+  line-height: 1.5;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.beta-banner-tag {
+  background: #c06060;
+  color: #1a0a0a;
+  font-family: var(--display);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  padding: 2px 7px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
 /* ── Waitlist section on the Profiles page ── */
 .waitlist-section {
   margin-top: 28px;

@@ -146,6 +146,18 @@ async function showApp(body) {
       </div>`;
   }
 
+  const activeProfile = profiles[activeKey] || {};
+  const STORE_LABELS = {
+    'supreme-brooklyn': 'Brooklyn',
+    'supreme-chicago': 'Chicago',
+    'supreme-newyork': 'Manhattan',
+    'supreme-sanfrancisco': 'San Francisco',
+    'supreme-losangeles': 'Los Angeles',
+    'suprememiami': 'Miami',
+  };
+  const storeOptions = Object.entries(STORE_LABELS)
+    .map(([v, l]) => `<option value="${v}" ${settings.waitlistStore === v ? 'selected' : ''}>${l}</option>`).join('');
+
   body.innerHTML = `
     <div class="profiles-list" id="profiles-list">
       ${keys.map(k => profileCard(k, k === activeKey)).join('')}
@@ -164,6 +176,36 @@ async function showApp(body) {
           <span class="toggle-track"></span>
         </label>
       </label>
+
+      <label class="toggle-row">
+        <span class="toggle-label">Auto-Checkout <span class="beta-tag">SUPREME · BETA</span></span>
+        <label class="toggle">
+          <input type="checkbox" id="p-autoCheckout" ${activeProfile.autoCheckout ? 'checked' : ''}>
+          <span class="toggle-track"></span>
+        </label>
+      </label>
+
+      <label class="toggle-row">
+        <span class="toggle-label">In-Store Auto-Booking <span class="beta-tag">BETA</span></span>
+        <label class="toggle">
+          <input type="checkbox" id="s-waitlistAutoBook" ${settings.waitlistAutoBook ? 'checked' : ''}>
+          <span class="toggle-track"></span>
+        </label>
+      </label>
+
+      <div class="waitlist-config" id="waitlist-config" style="display:${settings.waitlistAutoBook ? 'block' : 'none'}">
+        <select id="s-waitlistStore" class="waitlist-select">
+          <option value="">— Pick your store —</option>
+          ${storeOptions}
+        </select>
+        <a href="https://waitwhile.com/accounts/supremenewyork?ww-ref=directory" target="_blank" class="waitlist-open-link">
+          Open Waitwhile →
+        </a>
+      </div>
+
+      <p class="beta-disclaimer">
+        ⚠ BETA features may charge real money. Use at your own risk.
+      </p>
     </div>
   `;
 
@@ -218,6 +260,50 @@ async function showApp(body) {
     const d = await S.get('settings');
     const s = d.settings || {};
     s.autoFill = e.target.checked;
+    await S.set({ settings: s });
+  });
+
+  // ── Auto-Checkout (per active profile) ───────────────────────────────────
+  document.getElementById('p-autoCheckout').addEventListener('change', async (e) => {
+    if (e.target.checked) {
+      const ok = confirm(
+        '🛹 HOLD UP TIMMY\n\n' +
+        'Do you even skate, bor?\n\n' +
+        "Cause the second you flip this on, the next Supreme checkout page you load is gonna get the pay button SLAMMED — no asking, no 'are you sure', no review your cart moment. Real card. Real charge. Real Timmy moment.\n\n" +
+        '• Wrong size in cart? Your problem.\n' +
+        '• Forgot to turn this off from yesterday? Your problem.\n' +
+        '• Wife checks the credit card statement? Your problem (Timmy).\n\n' +
+        'Auto-Checkout turns itself OFF after every order so you don\'t double-buy. But it\'s on you to flip it on at the right second.\n\n' +
+        'Hit OK if you actually skate. Cancel if you got scared.'
+      );
+      if (!ok) { e.target.checked = false; return; }
+    }
+    const d = await S.get(['profiles', 'activeProfile']);
+    const profs = d.profiles || {};
+    const key   = d.activeProfile;
+    if (!profs[key]) return;
+    profs[key].autoCheckout = e.target.checked;
+    await S.set({ profiles: profs });
+  });
+
+  // ── Waitlist Auto-Booking (global setting) ────────────────────────────────
+  const waitlistConfig = document.getElementById('waitlist-config');
+  document.getElementById('s-waitlistAutoBook').addEventListener('change', async (e) => {
+    const d = await S.get('settings');
+    const s = d.settings || {};
+    s.waitlistAutoBook = e.target.checked;
+    await S.set({ settings: s, waitwhileStopped: false });
+    waitlistConfig.style.display = e.target.checked ? 'block' : 'none';
+    // Nudge them to pick a store if they enabled but haven't selected one
+    if (e.target.checked && !s.waitlistStore) {
+      setTimeout(() => alert('Pick your preferred Supreme store from the dropdown below so the auto-booker knows where to head.'), 100);
+    }
+  });
+
+  document.getElementById('s-waitlistStore').addEventListener('change', async (e) => {
+    const d = await S.get('settings');
+    const s = d.settings || {};
+    s.waitlistStore = e.target.value;
     await S.set({ settings: s });
   });
 
