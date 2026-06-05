@@ -213,9 +213,12 @@ function showDashboardGate() {
         <p style="font-size:13px;line-height:1.6;margin-bottom:24px">
           This dashboard is locked. Open the Finest Checkouts popup (click the extension icon in your browser toolbar) and enter your license key to activate.
         </p>
-        <p style="font-size:11px;color:#7a6f56">
+        <p style="font-size:11px;color:#7a6f56;margin-bottom:16px">
           Already activated? Your license may have expired or been revoked.
           Re-enter your key in the popup to re-activate.
+        </p>
+        <p style="font-size:11px;color:#7a6f56">
+          Lost your key? <a href="https://finest-license-server-production.up.railway.app/recover" target="_blank" style="color:#c9a84c;text-decoration:none">Recover it →</a>
         </p>
       </div>
     </div>`;

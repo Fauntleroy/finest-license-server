@@ -49,6 +49,9 @@ function showLicenseGate(body) {
       <div class="license-link">
         Don't have a key? <a href="https://whop.com/finest-tools" target="_blank">Get access →</a>
       </div>
+      <div class="license-link" style="margin-top:6px">
+        Lost your key? <a href="https://finest-license-server-production.up.railway.app/recover" target="_blank">Recover →</a>
+      </div>
     </div>
   `;
 
