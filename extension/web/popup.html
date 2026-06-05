@@ -333,27 +333,18 @@
       box-shadow: 0 12px 40px rgba(0,0,0,0.6);
       box-sizing: border-box;
     }
-    .modal-image-area {
-      background: #00C040;
-      padding: 10px 12px 8px;
+    .modal-title-bar {
+      padding: 12px 14px 10px;
       text-align: center;
       flex-shrink: 0;
-    }
-    .modal-img {
-      max-width: 100%;
-      max-height: 90px;
-      width: auto;
-      height: auto;
-      margin: 0 auto 6px;
-      display: block;
-      object-fit: contain;
+      border-bottom: 1px solid var(--border);
     }
     .modal-title {
       font-family: var(--display);
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 800;
-      letter-spacing: 0.06em;
-      color: #fff;
+      letter-spacing: 0.08em;
+      color: var(--gold);
       margin: 0;
       line-height: 1.2;
     }
@@ -605,11 +596,10 @@
 
 <div id="popup-body"></div>
 
-<!-- Custom confirm modal -->
+<!-- Custom confirm modal (popup version — no image) -->
 <div class="modal-backdrop" id="ays-modal" hidden>
   <div class="modal-card">
-    <div class="modal-image-area">
-      <img class="modal-img" id="ays-img" src="images/are-you-sure.png" alt="" onerror="this.style.display='none'"/>
+    <div class="modal-title-bar">
       <div class="modal-title" id="ays-title">ARE YOU SURE ABOUT THAT?</div>
     </div>
     <div class="modal-body" id="ays-body"></div>

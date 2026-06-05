@@ -495,15 +495,22 @@ html, body {
   display: block;
   object-fit: contain;
 }
+.modal-title-bar {
+  padding: 16px 24px;
+  text-align: center;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
 .modal-title {
   font-family: var(--display);
   font-size: 18px;
   font-weight: 800;
   letter-spacing: 0.08em;
-  color: #fff;
   margin: 0;
   line-height: 1.2;
 }
+.modal-title-on-green { color: #fff; }
+.modal-title-on-dark  { color: var(--gold); }
 .modal-body {
   font-size: 13px;
   line-height: 1.55;

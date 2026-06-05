@@ -426,17 +426,39 @@ function syncAutoCheckoutToggle() {
   if (nameEl) nameEl.textContent = `Active profile: ${p.profileName || activeProfile}`;
 }
 
-// Custom confirm modal — supports title, body HTML, and button labels.
+// Custom confirm modal — supports title, body HTML, button labels, and
+// optional image area. Pass showImage: true to show the green image header
+// (only used for the first "ARE YOU SURE ABOUT THAT?" step). All other steps
+// get a compact gold title bar so the body has more room.
 // Pass cancelText: null to hide the Cancel button entirely.
 function areYouSureDash(opts) {
-  const { html = '', title = 'ARE YOU SURE ABOUT THAT?', okText = 'OK', cancelText = 'Cancel' } = opts || {};
+  const {
+    html = '',
+    title = 'ARE YOU SURE ABOUT THAT?',
+    okText = 'OK',
+    cancelText = 'Cancel',
+    showImage = false,
+  } = opts || {};
   return new Promise((resolve) => {
-    const modal  = document.getElementById('ays-modal');
-    const titleEl= document.getElementById('ays-title');
-    const body   = document.getElementById('ays-body');
-    const okBtn  = document.getElementById('ays-ok');
-    const cxBtn  = document.getElementById('ays-cancel');
-    titleEl.textContent = title;
+    const modal     = document.getElementById('ays-modal');
+    const imageArea = document.getElementById('ays-image-area');
+    const titleBar  = document.getElementById('ays-title-bar');
+    const greenT    = document.getElementById('ays-title-green');
+    const darkT     = document.getElementById('ays-title-dark');
+    const body      = document.getElementById('ays-body');
+    const okBtn     = document.getElementById('ays-ok');
+    const cxBtn     = document.getElementById('ays-cancel');
+
+    // Toggle image header vs gold title bar
+    if (showImage) {
+      imageArea.style.display = '';
+      titleBar.style.display  = 'none';
+    } else {
+      imageArea.style.display = 'none';
+      titleBar.style.display  = '';
+    }
+    greenT.textContent = title;
+    darkT.textContent  = title;
     body.innerHTML = html;
     okBtn.textContent = okText;
     if (cancelText === null) {
@@ -449,7 +471,7 @@ function areYouSureDash(opts) {
     body.scrollTop = 0;
     const cleanup = (val) => {
       modal.hidden = true;
-      cxBtn.style.display = ''; // reset
+      cxBtn.style.display = '';
       okBtn.removeEventListener('click', onOk);
       cxBtn.removeEventListener('click', onCx);
       document.removeEventListener('keydown', onKey);
@@ -471,12 +493,13 @@ function areYouSureDash(opts) {
 // Multi-step easter-egg confirmation chain for arming Auto-Checkout.
 // Each Cancel branches further down the chain. Final step has no escape.
 async function confirmAutoCheckoutEnable() {
-  // Step 1
+  // Step 1 — only step that shows the image header
   const r1 = await areYouSureDash({
     title: 'ARE YOU SURE ABOUT THAT?',
     html:  AUTOCHECKOUT_WARNING_HTML,
     okText: 'Yeah I skate bro',
     cancelText: 'No',
+    showImage: true,
   });
   if (!r1) return false;
 

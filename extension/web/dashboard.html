@@ -234,9 +234,12 @@
 <!-- Custom confirm modal -->
 <div class="modal-backdrop" id="ays-modal" hidden>
   <div class="modal-card">
-    <div class="modal-image-area">
+    <div class="modal-image-area" id="ays-image-area">
       <img class="modal-img" id="ays-img" src="images/are-you-sure.png" alt="" onerror="this.style.display='none'"/>
-      <div class="modal-title" id="ays-title">ARE YOU SURE ABOUT THAT?</div>
+      <div class="modal-title modal-title-on-green" id="ays-title-green">ARE YOU SURE ABOUT THAT?</div>
+    </div>
+    <div class="modal-title-bar" id="ays-title-bar">
+      <div class="modal-title modal-title-on-dark" id="ays-title-dark">ARE YOU SURE ABOUT THAT?</div>
     </div>
     <div class="modal-body" id="ays-body"></div>
     <div class="modal-actions">
