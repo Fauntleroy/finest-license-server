@@ -13,12 +13,24 @@ let profiles      = {};
 let activeProfile = null;
 let editingKey    = null;   // null = new profile
 
-// Second-step "are you absolutely sure" body.
-const ABSOLUTELY_SURE_HTML = `
-  <p>Last chance, Timmy.</p>
-  <div class="modal-bigtext">NO TAKEBACKS</div>
-  <p>Click <strong>100% yes</strong> and Auto-Checkout is armed.</p>
-  <p>The next Supreme checkout page you load gets bought without asking again. Cart looking weird? Close this and fix it first.</p>
+// Easter-egg branch copy for the multi-step auto-checkout flow.
+const STEP_DONT_SAY_HTML = `
+  <p>Don't say I didn't warn you when you pull some Timmy crap like buying a</p>
+  <div class="modal-bigtext">SUPREME X MAGIC ERASER 4-PACK</div>
+  <p>for $189 because somebody said it was the last one in stock.</p>
+`;
+const STEP_THEN_I_WONT_HTML = `
+  <p>Then I won't turn it on for you.</p>
+  <p>What do you think about that?</p>
+`;
+const STEP_WTF_HTML = `
+  <p>Wow.</p>
+  <div class="modal-bigtext">WTF IS WRONG WITH YOU?</div>
+  <p>That escalated fast.</p>
+`;
+const STEP_FINAL_HTML = `
+  <p>You know what? I hope you DO buy some dumb crap.</p>
+  <p>And I hope your mom takes your card away.</p>
 `;
 
 // Auto-checkout enable warning. The .modal-bigtext element renders header-style.
@@ -415,6 +427,7 @@ function syncAutoCheckoutToggle() {
 }
 
 // Custom confirm modal — supports title, body HTML, and button labels.
+// Pass cancelText: null to hide the Cancel button entirely.
 function areYouSureDash(opts) {
   const { html = '', title = 'ARE YOU SURE ABOUT THAT?', okText = 'OK', cancelText = 'Cancel' } = opts || {};
   return new Promise((resolve) => {
@@ -426,10 +439,17 @@ function areYouSureDash(opts) {
     titleEl.textContent = title;
     body.innerHTML = html;
     okBtn.textContent = okText;
-    cxBtn.textContent = cancelText;
+    if (cancelText === null) {
+      cxBtn.style.display = 'none';
+    } else {
+      cxBtn.style.display = '';
+      cxBtn.textContent = cancelText;
+    }
     modal.hidden = false;
+    body.scrollTop = 0;
     const cleanup = (val) => {
       modal.hidden = true;
+      cxBtn.style.display = ''; // reset
       okBtn.removeEventListener('click', onOk);
       cxBtn.removeEventListener('click', onCx);
       document.removeEventListener('keydown', onKey);
@@ -438,7 +458,7 @@ function areYouSureDash(opts) {
     const onOk  = () => cleanup(true);
     const onCx  = () => cleanup(false);
     const onKey = (ev) => {
-      if (ev.key === 'Escape') cleanup(false);
+      if (ev.key === 'Escape' && cancelText !== null) cleanup(false);
       if (ev.key === 'Enter')  cleanup(true);
     };
     okBtn.addEventListener('click', onOk);
@@ -448,20 +468,53 @@ function areYouSureDash(opts) {
   });
 }
 
-// Two-step confirmation used everywhere we arm Auto-Checkout
+// Multi-step easter-egg confirmation chain for arming Auto-Checkout.
+// Each Cancel branches further down the chain. Final step has no escape.
 async function confirmAutoCheckoutEnable() {
-  const ok1 = await areYouSureDash({
+  // Step 1
+  const r1 = await areYouSureDash({
     title: 'ARE YOU SURE ABOUT THAT?',
     html:  AUTOCHECKOUT_WARNING_HTML,
-    okText: 'Yeah I skate',
+    okText: 'Yeah I skate bro',
+    cancelText: 'No',
   });
-  if (!ok1) return false;
-  const ok2 = await areYouSureDash({
-    title: 'ARE YOU ABSOLUTELY SURE?',
-    html:  ABSOLUTELY_SURE_HTML,
-    okText: '100% yes, let it rip',
+  if (!r1) return false;
+
+  // Step 2
+  const r2 = await areYouSureDash({
+    title: "DON'T SAY I DIDN'T WARN YOU",
+    html:  STEP_DONT_SAY_HTML,
+    okText: "I'm down. Turn it on",
+    cancelText: "I will say you didn't warn me",
   });
-  return ok2;
+  if (r2) return true;
+
+  // Step 3
+  const r3 = await areYouSureDash({
+    title: 'OH IS THAT HOW IT IS?',
+    html:  STEP_THEN_I_WONT_HTML,
+    okText: "I'm sorry, please turn it on",
+    cancelText: "Eat a bag of sh!t!!",
+  });
+  if (r3) return true;
+
+  // Step 4
+  const r4 = await areYouSureDash({
+    title: 'EXCUSE ME?',
+    html:  STEP_WTF_HTML,
+    okText: "I'm sorry, please turn it on",
+    cancelText: "I was fine until I F'd your mom",
+  });
+  if (r4) return true;
+
+  // Step 5 — final, no cancel, only the engage button
+  await areYouSureDash({
+    title: 'OH WORD?',
+    html:  STEP_FINAL_HTML,
+    okText: 'Engage Auto-Checkout',
+    cancelText: null,
+  });
+  return true;
 }
 
 document.addEventListener('DOMContentLoaded', init);

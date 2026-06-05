@@ -22,12 +22,24 @@ function cardType(cc) {
   return 'Card';
 }
 
-// Second-step "are you absolutely sure" body.
-const ABSOLUTELY_SURE_HTML = `
-  <p>Last chance, Timmy.</p>
-  <div class="modal-bigtext">NO TAKEBACKS</div>
-  <p>Click <strong>100% yes</strong> and Auto-Checkout is armed.</p>
-  <p>The next Supreme checkout page you load gets bought without asking again. Cart looking weird? Close this and fix it first.</p>
+// Easter-egg branch copy for the multi-step auto-checkout flow.
+const STEP_DONT_SAY_HTML = `
+  <p>Don't say I didn't warn you when you pull some Timmy crap like buying a</p>
+  <div class="modal-bigtext">SUPREME X MAGIC ERASER 4-PACK</div>
+  <p>for $189 because somebody said it was the last one in stock.</p>
+`;
+const STEP_THEN_I_WONT_HTML = `
+  <p>Then I won't turn it on for you.</p>
+  <p>What do you think about that?</p>
+`;
+const STEP_WTF_HTML = `
+  <p>Wow.</p>
+  <div class="modal-bigtext">WTF IS WRONG WITH YOU?</div>
+  <p>That escalated fast.</p>
+`;
+const STEP_FINAL_HTML = `
+  <p>You know what? I hope you DO buy some dumb crap.</p>
+  <p>And I hope your mom takes your card away.</p>
 `;
 
 // Auto-checkout enable warning. The .modal-bigtext element renders header-style.
@@ -287,21 +299,11 @@ async function showApp(body) {
     await S.set({ settings: s });
   });
 
-  // ── Auto-Checkout (per active profile) — two-step confirm ────────────────
+  // ── Auto-Checkout (per active profile) — multi-step easter-egg chain ─────
   document.getElementById('p-autoCheckout').addEventListener('change', async (e) => {
     if (e.target.checked) {
-      const ok1 = await areYouSure({
-        title: 'ARE YOU SURE ABOUT THAT?',
-        html:  AUTOCHECKOUT_WARNING_HTML,
-        okText: 'Yeah I skate',
-      });
-      if (!ok1) { e.target.checked = false; return; }
-      const ok2 = await areYouSure({
-        title: 'ARE YOU ABSOLUTELY SURE?',
-        html:  ABSOLUTELY_SURE_HTML,
-        okText: '100% yes, let it rip',
-      });
-      if (!ok2) { e.target.checked = false; return; }
+      const ok = await confirmAutoCheckoutChain();
+      if (!ok) { e.target.checked = false; return; }
     }
     const d = await S.get(['profiles', 'activeProfile']);
     const profs = d.profiles || {};
@@ -312,6 +314,7 @@ async function showApp(body) {
   });
 
   // Custom confirm modal — supports title, body HTML, and button labels.
+  // Pass cancelText: null to hide the Cancel button entirely.
   function areYouSure(opts) {
     const { html = '', title = 'ARE YOU SURE ABOUT THAT?', okText = 'OK', cancelText = 'Cancel' } = opts || {};
     return new Promise((resolve) => {
@@ -323,10 +326,18 @@ async function showApp(body) {
       titleEl.textContent = title;
       body.innerHTML = html;
       okBtn.textContent = okText;
-      cxBtn.textContent = cancelText;
+      if (cancelText === null) {
+        cxBtn.style.display = 'none';
+      } else {
+        cxBtn.style.display = '';
+        cxBtn.textContent = cancelText;
+      }
       modal.hidden = false;
+      // Scroll body to top on each open so users see the start of new content
+      body.scrollTop = 0;
       const cleanup = (val) => {
         modal.hidden = true;
+        cxBtn.style.display = ''; // reset for next open
         okBtn.removeEventListener('click', onOk);
         cxBtn.removeEventListener('click', onCx);
         document.removeEventListener('keydown', onKey);
@@ -335,7 +346,7 @@ async function showApp(body) {
       const onOk  = () => cleanup(true);
       const onCx  = () => cleanup(false);
       const onKey = (ev) => {
-        if (ev.key === 'Escape') cleanup(false);
+        if (ev.key === 'Escape' && cancelText !== null) cleanup(false);
         if (ev.key === 'Enter')  cleanup(true);
       };
       okBtn.addEventListener('click', onOk);
@@ -343,6 +354,54 @@ async function showApp(body) {
       document.addEventListener('keydown', onKey);
       okBtn.focus();
     });
+  }
+
+  // Multi-step easter-egg confirmation chain for arming Auto-Checkout
+  async function confirmAutoCheckoutChain() {
+    // Step 1 — original warning
+    const r1 = await areYouSure({
+      title: 'ARE YOU SURE ABOUT THAT?',
+      html:  AUTOCHECKOUT_WARNING_HTML,
+      okText: 'Yeah I skate bro',
+      cancelText: 'No',
+    });
+    if (!r1) return false;
+
+    // Step 2 — don't say I didn't warn you (cancel branches down the chain)
+    const r2 = await areYouSure({
+      title: "DON'T SAY I DIDN'T WARN YOU",
+      html:  STEP_DONT_SAY_HTML,
+      okText: "I'm down. Turn it on",
+      cancelText: "I will say you didn't warn me",
+    });
+    if (r2) return true;
+
+    // Step 3 — fine then
+    const r3 = await areYouSure({
+      title: 'OH IS THAT HOW IT IS?',
+      html:  STEP_THEN_I_WONT_HTML,
+      okText: "I'm sorry, please turn it on",
+      cancelText: "Eat a bag of sh!t!!",
+    });
+    if (r3) return true;
+
+    // Step 4 — wtf
+    const r4 = await areYouSure({
+      title: 'EXCUSE ME?',
+      html:  STEP_WTF_HTML,
+      okText: "I'm sorry, please turn it on",
+      cancelText: "I was fine until I F'd your mom",
+    });
+    if (r4) return true;
+
+    // Step 5 — final, no escape, the only button arms it
+    await areYouSure({
+      title: 'OH WORD?',
+      html:  STEP_FINAL_HTML,
+      okText: 'Engage Auto-Checkout',
+      cancelText: null, // no way out — they earned this
+    });
+    return true;
   }
 
   // ── Waitlist Auto-Booking (global setting) ────────────────────────────────
