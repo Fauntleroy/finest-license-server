@@ -573,6 +573,22 @@ html, body {
   flex-shrink: 0;
 }
 
+/* Beta tag chip used inline next to a title */
+.beta-tag-inline {
+  display: inline-block;
+  background: #2a1f08;
+  border: 1px solid var(--gold-dim);
+  color: var(--gold);
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
 /* ── Waitlist section on the Profiles page ── */
 .waitlist-section {
   margin-top: 28px;

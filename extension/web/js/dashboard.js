@@ -56,15 +56,22 @@ function renderProfiles() {
 
   grid.innerHTML = '';
 
-  // Show the waitlist section only when at least one profile exists
+  // Show waitlist + autocheckout sections only when at least one profile exists
   const waitlistEl = document.getElementById('waitlist-section');
+  const autoEl     = document.getElementById('autocheckout-section');
+  const bannerEl   = document.getElementById('beta-banner');
   if (waitlistEl) waitlistEl.style.display = keys.length === 0 ? 'none' : '';
+  if (autoEl)     autoEl.style.display     = keys.length === 0 ? 'none' : '';
+  if (bannerEl)   bannerEl.style.display   = keys.length === 0 ? 'none' : '';
 
   if (keys.length === 0) {
     empty.classList.add('visible');
     return;
   }
   empty.classList.remove('visible');
+
+  // Sync the dashboard Auto-Checkout toggle with the active profile
+  syncAutoCheckoutToggle();
 
   for (const key of keys) {
     const p = profiles[key];
@@ -358,6 +365,22 @@ async function init() {
   document.getElementById('s-waitlistStore').addEventListener('change', (e) =>
     saveSetting('waitlistStore', e.target.value));
 
+  // ── Dashboard-level Auto-Checkout toggle (binds to the ACTIVE profile) ──
+  document.getElementById('d-autoCheckout').addEventListener('change', async (e) => {
+    if (!activeProfile || !profiles[activeProfile]) {
+      e.target.checked = false;
+      toast('Pick an active profile first');
+      return;
+    }
+    if (e.target.checked) {
+      const ok = await areYouSureDash(AUTOCHECKOUT_WARNING_HTML);
+      if (!ok) { e.target.checked = false; return; }
+    }
+    profiles[activeProfile].autoCheckout = e.target.checked;
+    await S.set({ profiles });
+    syncAutoCheckoutToggle();
+  });
+
   // Import / Export
   document.getElementById('btn-export').addEventListener('click', exportProfiles);
   document.getElementById('btn-import').addEventListener('click', () =>
@@ -365,6 +388,50 @@ async function init() {
   document.getElementById('file-import').addEventListener('change', (e) => {
     if (e.target.files[0]) importProfiles(e.target.files[0]);
     e.target.value = '';
+  });
+}
+
+// ── Sync the dashboard Auto-Checkout toggle with the currently active profile
+function syncAutoCheckoutToggle() {
+  const toggle = document.getElementById('d-autoCheckout');
+  const nameEl = document.getElementById('autocheckout-active-name');
+  if (!toggle) return;
+  if (!activeProfile || !profiles[activeProfile]) {
+    toggle.checked = false;
+    if (nameEl) nameEl.textContent = 'No active profile.';
+    return;
+  }
+  const p = profiles[activeProfile];
+  toggle.checked = !!p.autoCheckout;
+  if (nameEl) nameEl.textContent = `Active profile: ${p.profileName || activeProfile}`;
+}
+
+// Custom confirm modal — module-scope helper, used by the dashboard-level toggle
+function areYouSureDash(html) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('ays-modal');
+    const body  = document.getElementById('ays-body');
+    const okBtn = document.getElementById('ays-ok');
+    const cxBtn = document.getElementById('ays-cancel');
+    body.innerHTML = html;
+    modal.hidden = false;
+    const cleanup = (val) => {
+      modal.hidden = true;
+      okBtn.removeEventListener('click', onOk);
+      cxBtn.removeEventListener('click', onCx);
+      document.removeEventListener('keydown', onKey);
+      resolve(val);
+    };
+    const onOk  = () => cleanup(true);
+    const onCx  = () => cleanup(false);
+    const onKey = (ev) => {
+      if (ev.key === 'Escape') cleanup(false);
+      if (ev.key === 'Enter')  cleanup(true);
+    };
+    okBtn.addEventListener('click', onOk);
+    cxBtn.addEventListener('click', onCx);
+    document.addEventListener('keydown', onKey);
+    okBtn.focus();
   });
 }
 
