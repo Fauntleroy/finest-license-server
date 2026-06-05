@@ -13,6 +13,22 @@ let profiles      = {};
 let activeProfile = null;
 let editingKey    = null;   // null = new profile
 
+// Auto-checkout enable warning. The .modal-bigtext element renders header-style.
+const AUTOCHECKOUT_WARNING_HTML = `
+  <p>Do you even skate, bro?</p>
+  <p>Flip this on and the next Supreme checkout page you hit is getting</p>
+  <div class="modal-bigtext">PURCHASED IMMEDIATELY</div>
+  <p>No &ldquo;review cart,&rdquo; no second chance, no little safety hug.</p>
+  <p>Real card. Real charge. Real Timmy behavior.</p>
+  <ul>
+    <li>Wrong size in cart? That&rsquo;s on you.</li>
+    <li>Left it on from yesterday? That&rsquo;s on you.</li>
+    <li>Wife sees the card statement? That&rsquo;s on you, Timmy.</li>
+  </ul>
+  <p>Auto-Checkout shuts itself OFF after every completed order, so it will not keep firing like a maniac. But when you turn it on, you better mean it.</p>
+  <p>Use it for drop time and restock purposes only or be prepared to explain why you bought a rainbow BB Simon x Hot Topic glitter camp cap for $278 at 8:14 AM on a Friday.</p>
+`;
+
 // ─── Toast ───────────────────────────────────────────────────────────────────
 let toastTimer;
 function toast(msg) {
@@ -280,14 +296,7 @@ async function init() {
   document.getElementById('f-autoCheckout').addEventListener('change', async (e) => {
     const warning = document.getElementById('autocheckout-warning');
     if (e.target.checked) {
-      const ok = await areYouSure(
-        "Do you even skate, bor?\n\n" +
-        "Flip this on and the next Supreme checkout page you load gets the pay button SLAMMED — no asking, no 'are you sure', no review your cart moment. Real card. Real charge. Real Timmy moment.\n\n" +
-        "• Wrong size in cart? Your problem.\n" +
-        "• Forgot to turn this off from yesterday? Your problem.\n" +
-        "• Wife checks the credit card statement? Your problem (Timmy).\n\n" +
-        "Auto-Checkout turns itself OFF after every order so you don't double-buy. But it's on you to flip it on at the right second."
-      );
+      const ok = await areYouSure(AUTOCHECKOUT_WARNING_HTML);
       if (!ok) { e.target.checked = false; warning.style.display = 'none'; return; }
       warning.style.display = '';
     } else {
@@ -296,13 +305,13 @@ async function init() {
   });
 
   // ── Custom confirm modal (replaces native confirm() for image + style) ────
-  function areYouSure(message) {
+  function areYouSure(html) {
     return new Promise((resolve) => {
       const modal  = document.getElementById('ays-modal');
       const body   = document.getElementById('ays-body');
       const okBtn  = document.getElementById('ays-ok');
       const cxBtn  = document.getElementById('ays-cancel');
-      body.textContent = message;
+      body.innerHTML = html;
       modal.hidden = false;
       const cleanup = (val) => {
         modal.hidden = true;

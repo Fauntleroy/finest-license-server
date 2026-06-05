@@ -348,11 +348,25 @@
       line-height: 1.5;
       color: var(--text);
       text-align: left;
-      white-space: pre-wrap;
       margin-bottom: 14px;
-      max-height: 220px;
+      max-height: 260px;
       overflow-y: auto;
       padding-right: 4px;
+    }
+    .modal-body p { margin-bottom: 8px; }
+    .modal-body p:last-child { margin-bottom: 0; }
+    .modal-body ul { margin: 0 0 8px 16px; padding: 0; }
+    .modal-body li { margin-bottom: 3px; }
+    .modal-bigtext {
+      font-family: var(--display);
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      color: var(--gold);
+      text-align: center;
+      margin: 10px 0;
+      font-size: clamp(15px, 7vw, 19px);
+      line-height: 1.1;
+      white-space: nowrap;
     }
     .modal-body::-webkit-scrollbar { width: 3px; }
     .modal-body::-webkit-scrollbar-thumb { background: var(--bg-3); }
