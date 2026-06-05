@@ -699,6 +699,135 @@ app.post('/admin/reconcile-whop', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// POST /admin/edit-key — update email (and optionally plan) on a key
+// ─────────────────────────────────────────────
+app.post('/admin/edit-key', (req, res) => {
+  const { secret, key, email, plan } = req.body;
+  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
+  const keys = loadKeys();
+  const record = keys[key?.toUpperCase()];
+  if (!record) return res.json({ error: 'Key not found' });
+  if (email !== undefined) record.email = email;
+  if (plan  !== undefined) record.plan  = plan;
+  saveKeys(keys);
+  console.log(`[Admin] Edited ${key.toUpperCase()} — email: ${record.email}`);
+  return res.json({ ok: true, email: record.email, plan: record.plan });
+});
+
+// ─────────────────────────────────────────────
+// POST /admin/resend-key — re-send the licence email to the on-file address
+// ─────────────────────────────────────────────
+app.post('/admin/resend-key', async (req, res) => {
+  const { secret, key } = req.body;
+  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
+  const keys = loadKeys();
+  const upperKey = key?.toUpperCase();
+  const record = keys[upperKey];
+  if (!record) return res.json({ error: 'Key not found' });
+  if (!record.email || !record.email.includes('@')) {
+    return res.json({ error: `Key has no valid email on file (current: "${record.email}")` });
+  }
+  const ok = await sendKeyEmailTracked(record.email, upperKey);
+  console.log(`[Admin] Resent ${upperKey} to ${record.email} — ${ok ? 'OK' : 'FAILED'}`);
+  return res.json({ ok, email: record.email });
+});
+
+// ─────────────────────────────────────────────
+// POST /recover — user-facing lost-key recovery (public)
+// Looks up active keys matching the given email and re-sends the licence email.
+// Rate-limited to prevent abuse: 1 request per email per 5 min.
+// ─────────────────────────────────────────────
+const recoveryAttempts = new Map(); // email → last attempt timestamp
+app.post('/recover', async (req, res) => {
+  const email = (req.body?.email || '').trim().toLowerCase();
+  if (!email || !email.includes('@')) {
+    return res.json({ error: 'Please enter a valid email address.' });
+  }
+
+  // Simple rate limit: one request per email per 5 minutes
+  const lastTry = recoveryAttempts.get(email);
+  if (lastTry && Date.now() - lastTry < 5 * 60 * 1000) {
+    return res.json({ ok: true, message: 'If a licence exists for that email, we just sent it. Check your inbox (and spam folder).' });
+  }
+  recoveryAttempts.set(email, Date.now());
+
+  const keys = loadKeys();
+  // Find active keys belonging to this email
+  const matches = Object.entries(keys).filter(
+    ([, r]) => r.status === 'active' && r.email && r.email.toLowerCase() === email
+  );
+
+  // Always return the same generic message — don't reveal whether the email exists
+  const genericResponse = { ok: true, message: 'If a licence exists for that email, we just sent it. Check your inbox (and spam folder).' };
+
+  if (!matches.length) {
+    console.log(`[Recover] No active keys for ${email}`);
+    return res.json(genericResponse);
+  }
+
+  // Re-send each active key (usually just one, but loop in case)
+  for (const [key] of matches) {
+    await sendKeyEmailTracked(email, key);
+    console.log(`[Recover] Resent ${key} to ${email}`);
+  }
+  return res.json(genericResponse);
+});
+
+// ─────────────────────────────────────────────
+// GET /recover — user-facing page
+// ─────────────────────────────────────────────
+app.get('/recover', (req, res) => {
+  res.send(`<!DOCTYPE html><html><head><title>Recover Your Finest Checkouts Licence</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:#080808;color:#f0e6c8;font-family:monospace;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+    .card{max-width:420px;width:100%;text-align:center;}
+    .brand{color:#c9a84c;font-size:18px;font-weight:800;letter-spacing:0.1em;margin-bottom:8px;}
+    .sub{color:#7a6f56;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:28px;}
+    p{font-size:13px;line-height:1.6;margin-bottom:24px;color:#c8bfaa;}
+    input{background:#181818;border:1px solid #252525;border-radius:5px;color:#f0e6c8;font-family:monospace;font-size:13px;padding:12px 14px;width:100%;outline:none;margin-bottom:12px;text-align:center;}
+    input:focus{border-color:#7a5e1e;}
+    button{background:#c9a84c;border:none;border-radius:5px;color:#080808;font-family:monospace;font-size:13px;font-weight:700;padding:12px 24px;width:100%;cursor:pointer;letter-spacing:0.04em;}
+    button:hover:not(:disabled){background:#e4be6a;}
+    button:disabled{background:#252525;color:#555;cursor:default;}
+    .msg{font-size:12px;margin-top:16px;min-height:18px;color:#7ec98a;}
+    .err{color:#c06060;}
+  </style></head>
+  <body>
+    <div class="card">
+      <div class="brand">FINEST CHECKOUTS</div>
+      <div class="sub">Recover Licence</div>
+      <p>Lost your licence key? Enter the email you used to purchase and we'll re-send it.</p>
+      <form id="f">
+        <input id="e" type="email" placeholder="your@email.com" required autofocus/>
+        <button type="submit" id="b">Send My Key</button>
+      </form>
+      <div class="msg" id="m"></div>
+    </div>
+    <script>
+      const f = document.getElementById('f');
+      const b = document.getElementById('b');
+      const m = document.getElementById('m');
+      f.onsubmit = async (ev) => {
+        ev.preventDefault();
+        b.disabled = true; b.textContent = 'Sending...';
+        m.textContent = ''; m.classList.remove('err');
+        try {
+          const r = await fetch('/recover', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: document.getElementById('e').value }) });
+          const d = await r.json();
+          if (d.error) { m.textContent = d.error; m.classList.add('err'); }
+          else { m.textContent = d.message; }
+        } catch (err) {
+          m.textContent = 'Something went wrong. Please try again.'; m.classList.add('err');
+        } finally {
+          b.disabled = false; b.textContent = 'Send My Key';
+        }
+      };
+    </script>
+  </body></html>`);
+});
+
+// ─────────────────────────────────────────────
 // POST /broadcast  (admin — send update email to all users)
 // ─────────────────────────────────────────────
 app.post('/broadcast', async (req, res) => {
@@ -858,14 +987,17 @@ app.get('/admin', (req, res) => {
     const date   = record.createdAt ? new Date(record.createdAt).toLocaleDateString() : '—';
     const lastSeen = record.lastSeen ? new Date(record.lastSeen).toLocaleString() : '—';
     const revoked = record.revokedReason || '—';
+    const hasEmail = record.email && record.email.includes('@');
     return `
       <tr>
         <td class="key-cell">${key}</td>
-        <td>${email}</td>
+        <td><span class="email-cell" data-key="${key}">${email}</span></td>
         <td>${source}</td>
         <td>${date}</td>
         ${!isActive ? `<td>${revoked}</td>` : `<td>${lastSeen}</td>`}
         <td>
+          <button class="btn-edit" onclick="editEmail('${key}')" title="Edit email on file">Edit</button>
+          ${isActive && hasEmail ? `<button class="btn-email" onclick="resendKey('${key}')" title="Re-send licence email">📧 Send</button>` : ''}
           ${isActive ? `<button class="btn-revoke" onclick="revokeKey('${key}')">Revoke</button>` : ''}
           <button class="btn-delete" onclick="deleteKey('${key}')">Delete</button>
         </td>
@@ -891,6 +1023,10 @@ app.get('/admin', (req, res) => {
     .btn-revoke:hover{background:#5a3e10;}
     .btn-delete{background:#2a0a0a;border:1px solid #7a1e1e;color:#c06060;font-family:monospace;font-size:10px;padding:3px 10px;border-radius:4px;cursor:pointer;}
     .btn-delete:hover{background:#4a1010;}
+    .btn-edit{background:#181818;border:1px solid #444;color:#888;font-family:monospace;font-size:10px;padding:3px 10px;border-radius:4px;cursor:pointer;margin-right:4px;}
+    .btn-edit:hover{background:#252525;color:#c8bfaa;border-color:#666;}
+    .btn-email{background:#0a1a2a;border:1px solid #2a5a7a;color:#7eb8e0;font-family:monospace;font-size:10px;padding:3px 10px;border-radius:4px;cursor:pointer;margin-right:4px;}
+    .btn-email:hover{background:#15324a;}
     .gen-form{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
     .gen-form input{background:#101010;border:1px solid #252525;border-radius:4px;color:#f0e6c8;font-family:monospace;font-size:12px;padding:7px 10px;outline:none;}
     .gen-form input:focus{border-color:#7a5e1e;}
@@ -965,6 +1101,26 @@ app.get('/admin', (req, res) => {
       const d = await r.json();
       if (d.deleted) { toast('Deleted ' + key); location.reload(); }
       else toast('Error: ' + (d.error || 'unknown'));
+    }
+
+    async function editEmail(key) {
+      const current = document.querySelector('.email-cell[data-key="' + key + '"]')?.textContent || '';
+      const next = prompt('Edit email for ' + key + ':', current === '—' ? '' : current);
+      if (next === null) return; // cancelled
+      const trimmed = next.trim();
+      const r = await fetch('/admin/edit-key', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({secret:SECRET, key, email: trimmed}) });
+      const d = await r.json();
+      if (d.ok) { toast('Updated ' + key); location.reload(); }
+      else toast('Error: ' + (d.error || 'unknown'));
+    }
+
+    async function resendKey(key) {
+      if (!confirm('Resend licence email for ' + key + ' to the address on file?')) return;
+      toast('Sending...');
+      const r = await fetch('/admin/resend-key', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({secret:SECRET, key}) });
+      const d = await r.json();
+      if (d.ok) toast('Sent to ' + d.email);
+      else toast('Error: ' + (d.error || 'send failed'));
     }
 
     async function revokeKey(key) {
