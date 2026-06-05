@@ -38,7 +38,10 @@ const License = {
       const res = await fetch(`${LICENSE_SERVER}/validate`, {
         method  : 'POST',
         headers : { 'Content-Type': 'application/json' },
-        body    : JSON.stringify({ key: key.trim().toUpperCase() }),
+        body    : JSON.stringify({
+          key:     key.trim().toUpperCase(),
+          version: chrome.runtime.getManifest().version,
+        }),
       });
 
       if (!res.ok) return { valid: false, message: 'Server error. Try again.' };

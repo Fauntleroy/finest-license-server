@@ -51,7 +51,10 @@ async function validateLicense() {
     const res = await fetch(`${SERVER}/validate`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ key: licenseKey.trim().toUpperCase() }),
+      body:    JSON.stringify({
+        key:     licenseKey.trim().toUpperCase(),
+        version: chrome.runtime.getManifest().version,
+      }),
     });
     if (!res.ok) return; // server error → leave cache alone
     const data = await res.json();

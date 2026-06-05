@@ -15,6 +15,27 @@
   if (window.__finestAIO) return;
   window.__finestAIO = true;
 
+  // ─── One-shot version ping (rate-limited to 1/hour per browser) ────────────
+  // Tells the server which extension version this user is currently running so
+  // the admin dashboard can show who's up to date. Safe to run on every page —
+  // throttled via chrome.storage so we don't spam the server.
+  (async () => {
+    try {
+      const d = await chrome.storage.local.get(['licenseKey', 'versionReportedAt', 'versionReportedAs']);
+      if (!d.licenseKey) return;
+      const ver = chrome.runtime.getManifest().version;
+      const ONE_HOUR = 60 * 60 * 1000;
+      const reportedRecently = d.versionReportedAs === ver && d.versionReportedAt && (Date.now() - d.versionReportedAt) < ONE_HOUR;
+      if (reportedRecently) return;
+      await fetch('https://finest-license-server-production.up.railway.app/version-report', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ key: d.licenseKey, version: ver }),
+      });
+      await chrome.storage.local.set({ versionReportedAt: Date.now(), versionReportedAs: ver });
+    } catch {}
+  })();
+
   const STATE_MAP = {
     'AL':'Alabama','AK':'Alaska','AZ':'Arizona','AR':'Arkansas','CA':'California',
     'CO':'Colorado','CT':'Connecticut','DE':'Delaware','FL':'Florida','GA':'Georgia',

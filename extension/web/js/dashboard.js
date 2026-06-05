@@ -86,6 +86,7 @@ async function setActive(key) {
 // ─── Editor ───────────────────────────────────────────────────────────────────
 const FIELDS = ['profileName','fName','lName','email','phone','address','address2',
                 'city','state','zip','country','CC','expiry','cvv','nameOnCard'];
+const BOOL_FIELDS = ['autoCheckout'];
 
 function openEditor(key = null) {
   editingKey = key;
@@ -100,10 +101,18 @@ function openEditor(key = null) {
     const el = document.getElementById(`f-${f}`);
     if (el) el.value = p[f] || '';
   }
+  for (const f of BOOL_FIELDS) {
+    const el = document.getElementById(`f-${f}`);
+    if (el) el.checked = !!p[f];
+  }
 
   // Format CC on load
   const ccEl = document.getElementById('f-CC');
   if (ccEl.value) ccEl.value = formatCC(ccEl.value);
+
+  // Show the warning banner whenever the toggle is currently on
+  document.getElementById('autocheckout-warning').style.display =
+    document.getElementById('f-autoCheckout').checked ? '' : 'none';
 
   showView('editor');
 }
@@ -113,6 +122,10 @@ function readForm() {
   for (const f of FIELDS) {
     const el = document.getElementById(`f-${f}`);
     if (el) p[f] = el.value.trim();
+  }
+  for (const f of BOOL_FIELDS) {
+    const el = document.getElementById(`f-${f}`);
+    if (el) p[f] = el.checked;
   }
   // Store CC without spaces internally, but display with spaces
   p.CC = p.CC.replace(/\s/g, '');
@@ -253,6 +266,26 @@ async function init() {
   });
   document.getElementById('btn-save-profile').addEventListener('click', saveProfile);
   document.getElementById('btn-delete-profile').addEventListener('click', deleteProfile);
+
+  // Auto-checkout — show big warning when enabling, allow easy disable
+  document.getElementById('f-autoCheckout').addEventListener('change', (e) => {
+    const warning = document.getElementById('autocheckout-warning');
+    if (e.target.checked) {
+      const ok = confirm(
+        '⚠ AUTO-CHECKOUT WILL PLACE REAL ORDERS\n\n' +
+        'When this profile is active and you load a Supreme checkout page, ' +
+        'the extension will fill your info AND CLICK SUBMIT — completing the purchase ' +
+        'with no further confirmation.\n\n' +
+        'You will spend real money the moment a checkout page loads. ' +
+        'Use this only when you are 100% sure you want to buy whatever is in your cart.\n\n' +
+        'Click OK to enable. Click Cancel to keep it off.'
+      );
+      if (!ok) { e.target.checked = false; warning.style.display = 'none'; return; }
+      warning.style.display = '';
+    } else {
+      warning.style.display = 'none';
+    }
+  });
 
   // CC auto-format — track cursor by digit count so spaces don't shift it
   document.getElementById('f-CC').addEventListener('input', (e) => {

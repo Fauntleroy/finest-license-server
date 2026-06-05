@@ -175,6 +175,43 @@
     }
   }
 
+  // ─── Auto-checkout (per-profile opt-in) ───────────────────────────────────
+  // Profile must have autoCheckout: true. After fillSupreme + a settle delay,
+  // wait for the PCI iframe(s) to finish filling, then click the pay button.
+  async function maybeAutoSubmit(profile) {
+    if (!profile?.autoCheckout) return;
+
+    // Give the PCI iframes 2.5s to finish filling (they run independently)
+    await delay(2500);
+
+    // Wait up to 8s for a usable submit button. Supreme's checkout uses a few
+    // different labels depending on the layout.
+    const start = Date.now();
+    while (Date.now() - start < 8000) {
+      const btn = Array.from(document.querySelectorAll('button')).find(b => {
+        const t = b.textContent.trim().toLowerCase();
+        const usable = !b.disabled && b.offsetParent !== null;
+        return usable && (
+          t === 'pay now' ||
+          t === 'place order' ||
+          t === 'complete order' ||
+          t.includes('pay now') ||
+          t.includes('place order') ||
+          t.includes('complete order')
+        );
+      });
+      if (btn) {
+        // Brief natural delay so we don't fire on the same animation frame as the fill
+        await delay(150 + Math.random() * 200);
+        btn.click();
+        console.log('[Finest] Auto-checkout: submit clicked.');
+        return;
+      }
+      await delay(300);
+    }
+    console.log('[Finest] Auto-checkout: submit button not found within 8s.');
+  }
+
   // ─── Run ──────────────────────────────────────────────────────────────────
   async function isLicensed() {
     const d = await chrome.storage.local.get(['licenseKey', 'licenseValid']);
@@ -191,6 +228,7 @@
     await waitFor('[autocomplete="email"], [autocomplete="shipping email"], input[type="email"], [name="email"], #email');
     await delay(300);
     await fillSupreme(profile);
+    await maybeAutoSubmit(profile);
   }
 
   run();
@@ -200,6 +238,7 @@
       (async () => {
         if (!(await isLicensed())) { sendResponse({ ok: false, error: 'unlicensed' }); return; }
         await fillSupreme(msg.profile);
+        await maybeAutoSubmit(msg.profile);
         sendResponse({ ok: true });
       })();
       return true;

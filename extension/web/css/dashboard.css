@@ -325,6 +325,38 @@ html, body {
   padding: 0 8px;
 }
 
+.autocheckout-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+}
+.autocheckout-info { flex: 1; }
+.autocheckout-title {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.autocheckout-desc {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.autocheckout-desc strong { color: var(--gold); }
+.autocheckout-warning {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: #2a0a0a;
+  border: 1px solid #7a1e1e;
+  border-radius: 5px;
+  color: #e89898;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .field-row {
   display: flex;
   gap: 14px;

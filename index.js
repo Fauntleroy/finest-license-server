@@ -494,8 +494,29 @@ app.post('/validate', (req, res) => {
   if (record.status !== 'active')    return res.json({ valid: false, message: 'License is inactive.' });
 
   record.lastSeen = new Date().toISOString();
+  if (req.body.version && typeof req.body.version === 'string') {
+    record.installedVersion = req.body.version;
+  }
   saveKeys(keys);
   return res.json({ valid: true, message: 'License valid.', plan: record.plan || 'member' });
+});
+
+// ─────────────────────────────────────────────
+// POST /version-report — content script pings this with their version
+// Lightweight alternative to /validate when the content script doesn't
+// need to know if the key is valid, just to register the version.
+// ─────────────────────────────────────────────
+app.post('/version-report', (req, res) => {
+  const key = (req.body?.key || '').trim().toUpperCase();
+  const version = req.body?.version;
+  if (!key || !version || typeof version !== 'string') return res.json({ ok: false });
+  const keys = loadKeys();
+  const record = keys[key];
+  if (!record) return res.json({ ok: false });
+  record.installedVersion = version;
+  record.lastSeen = new Date().toISOString();
+  saveKeys(keys);
+  return res.json({ ok: true });
 });
 
 // ─────────────────────────────────────────────
@@ -1007,6 +1028,8 @@ app.get('/admin', (req, res) => {
     ([,r]) => r.status === 'active' && r.email && r.email.includes('@') && r.emailSent === false
   );
 
+  const CURRENT_VERSION = process.env.CURRENT_VERSION || '2.2.4';
+
   function row(key, record, isActive) {
     const source = record.source || '—';
     const email  = record.email || record.discordTag || '—';
@@ -1014,11 +1037,17 @@ app.get('/admin', (req, res) => {
     const lastSeen = record.lastSeen ? new Date(record.lastSeen).toLocaleString() : '—';
     const revoked = record.revokedReason || '—';
     const hasEmail = record.email && record.email.includes('@');
+    const ver = record.installedVersion || '—';
+    const verStale = ver !== '—' && ver !== CURRENT_VERSION;
+    const verCell = ver === '—'
+      ? `<span style="color:#555">${ver}</span>`
+      : `<span style="color:${verStale ? '#e8b04c' : '#7ec98a'}" title="${verStale ? 'Older than current ('+CURRENT_VERSION+')' : 'Up to date'}">${ver}</span>`;
     return `
       <tr>
         <td class="key-cell">${key}</td>
         <td><span class="email-cell" data-key="${key}">${email}</span></td>
         <td>${source}</td>
+        <td>${verCell}</td>
         <td>${date}</td>
         ${!isActive ? `<td>${revoked}</td>` : `<td>${lastSeen}</td>`}
         <td>
@@ -1092,14 +1121,14 @@ app.get('/admin', (req, res) => {
 
   <div id="panel-active" class="panel active">
     <table>
-      <thead><tr><th>Key</th><th>Email / User</th><th>Source</th><th>Created</th><th>Last Seen</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Key</th><th>Email / User</th><th>Source</th><th>Version</th><th>Created</th><th>Last Seen</th><th>Actions</th></tr></thead>
       <tbody>${active.map(([k,r]) => row(k,r,true)).join('')}</tbody>
     </table>
   </div>
 
   <div id="panel-inactive" class="panel">
     <table>
-      <thead><tr><th>Key</th><th>Email / User</th><th>Source</th><th>Created</th><th>Reason</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Key</th><th>Email / User</th><th>Source</th><th>Version</th><th>Created</th><th>Reason</th><th>Actions</th></tr></thead>
       <tbody>${inactive.map(([k,r]) => row(k,r,false)).join('')}</tbody>
     </table>
   </div>
@@ -1214,7 +1243,7 @@ app.post('/admin/assign-roles', async (req, res) => {
 // ─────────────────────────────────────────────
 app.get('/version', (req, res) => {
   res.json({
-    version:     process.env.CURRENT_VERSION || '2.2.3',
+    version:     process.env.CURRENT_VERSION || '2.2.4',
     downloadUrl: EXTENSION_DOWNLOAD_URL || null,
     scripts: {
       fnl:             `${SERVER_URL}/scripts/fnl.js`,
