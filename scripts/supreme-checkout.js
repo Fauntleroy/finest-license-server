@@ -172,38 +172,124 @@
   // â”€â”€â”€ Auto-checkout (per-profile opt-in) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Profile must have autoCheckout: true. After fillSupreme + a settle delay,
   // wait for the PCI iframe(s) to finish filling, then click the pay button.
-  async function maybeAutoSubmit(profile) {
+  // After a successful submit, auto-disables the toggle so it doesn't fire on
+  // a second checkout in the same session.
+  async function maybeAutoSubmit(profile, profileKey) {
     if (!profile?.autoCheckout) return;
 
-    // Give the PCI iframes 2.5s to finish filling (they run independently)
+    // Give the PCI iframes ~2.5s to finish filling card/expiry/CVV
     await delay(2500);
 
-    // Wait up to 8s for a usable submit button. Supreme's checkout uses a few
-    // different labels depending on the layout.
-    const start = Date.now();
-    while (Date.now() - start < 8000) {
-      const btn = Array.from(document.querySelectorAll('button')).find(b => {
+    // Find the pay button. Primary: Supreme's stable #checkout-pay-button id.
+    // Fallbacks for any layout variants.
+    const findPayBtn = () => {
+      const byId = document.querySelector('#checkout-pay-button');
+      if (byId && !byId.disabled && byId.offsetParent !== null) return byId;
+
+      const byAria = document.querySelector('[aria-label="process payment"]');
+      if (byAria && !byAria.disabled && byAria.offsetParent !== null) return byAria;
+
+      const byEvent = document.querySelector('[data-event-name="pay_button_inline"]');
+      if (byEvent && !byEvent.disabled && byEvent.offsetParent !== null) return byEvent;
+
+      // Last-resort text match
+      return Array.from(document.querySelectorAll('button')).find(b => {
         const t = b.textContent.trim().toLowerCase();
-        const usable = !b.disabled && b.offsetParent !== null;
-        return usable && (
-          t === 'pay now' ||
-          t === 'place order' ||
-          t === 'complete order' ||
-          t.includes('pay now') ||
-          t.includes('place order') ||
-          t.includes('complete order')
+        return !b.disabled && b.offsetParent !== null && (
+          t === 'pay now' || t === 'place order' || t === 'complete order' ||
+          t.includes('pay now') || t.includes('place order')
         );
       });
-      if (btn) {
-        // Brief natural delay so we don't fire on the same animation frame as the fill
-        await delay(150 + Math.random() * 200);
-        btn.click();
-        console.log('[Finest] Auto-checkout: submit clicked.');
-        return;
-      }
-      await delay(300);
+    };
+
+    // Wait up to 10s for the button to be present + enabled
+    const start = Date.now();
+    let btn = null;
+    while (Date.now() - start < 10000) {
+      btn = findPayBtn();
+      if (btn) break;
+      await delay(250);
     }
-    console.log('[Finest] Auto-checkout: submit button not found within 8s.');
+
+    if (!btn) {
+      console.log('[Finest] Auto-checkout: pay button not found within 10s.');
+      return;
+    }
+
+    // Small natural delay so we don't fire on the same animation frame as the fill
+    await delay(150 + Math.random() * 200);
+    btn.click();
+    console.log('[Finest] Auto-checkout: pay button clicked.');
+
+    // Safety: disable autoCheckout immediately so any subsequent checkout in
+    // this session won't auto-submit until the user explicitly re-enables it.
+    await disableAutoCheckoutAfterPurchase(profileKey);
+
+    // Watch for the order confirmation page and show a popup overlay if we land
+    // there. If not, the order may have failed â€” we already disabled, so the
+    // user can decide what to do.
+    watchForConfirmation();
+  }
+
+  async function disableAutoCheckoutAfterPurchase(profileKey) {
+    try {
+      const { profiles, activeProfile } = await chrome.storage.local.get(['profiles', 'activeProfile']);
+      const key = profileKey || activeProfile;
+      if (!profiles || !key || !profiles[key]) return;
+      profiles[key].autoCheckout = false;
+      await chrome.storage.local.set({ profiles });
+      console.log('[Finest] Auto-checkout disabled for profile:', key);
+    } catch (e) {
+      console.warn('[Finest] Could not disable autoCheckout:', e);
+    }
+  }
+
+  function watchForConfirmation() {
+    const SUCCESS_RE = /\/(thank[_-]?you|order[_-]?confirmation|orders\/\w+|checkout\/[a-z0-9]+\/post-purchase)/i;
+    let lastUrl = location.href;
+
+    function isSuccessUrl() { return SUCCESS_RE.test(location.pathname); }
+
+    if (isSuccessUrl()) { showPurchaseOverlay(); return; }
+
+    const poll = setInterval(() => {
+      if (location.href !== lastUrl) {
+        lastUrl = location.href;
+        if (isSuccessUrl()) {
+          clearInterval(poll);
+          showPurchaseOverlay();
+        }
+      }
+    }, 400);
+
+    // Stop watching after 60s either way
+    setTimeout(() => clearInterval(poll), 60000);
+  }
+
+  function showPurchaseOverlay() {
+    if (document.getElementById('finest-purchase-overlay')) return;
+    const div = document.createElement('div');
+    div.id = 'finest-purchase-overlay';
+    div.style.cssText = `
+      position: fixed; top: 20px; right: 20px; z-index: 999999;
+      background: #080808; color: #c9a84c;
+      padding: 14px 18px; border: 1px solid #7a5e1e; border-radius: 6px;
+      font-family: monospace; font-size: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      max-width: 320px; line-height: 1.5;
+    `;
+    div.innerHTML = `
+      <div style="font-weight:700;margin-bottom:6px">âš¡ Finest â€” Purchase Submitted</div>
+      <div style="color:#c8bfaa;font-size:11px;margin-bottom:8px">
+        Auto-checkout has been turned <strong style="color:#7ec98a">OFF</strong> on this profile so you don't accidentally double-buy.
+      </div>
+      <div style="color:#7a6f56;font-size:10px">
+        Re-enable from Dashboard â†’ Profile â†’ Auto-Checkout if you want it on for another order.
+      </div>
+    `;
+    document.body.appendChild(div);
+    // Auto-dismiss after 30s
+    setTimeout(() => div.remove(), 30000);
   }
 
   // â”€â”€â”€ Run â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -222,7 +308,7 @@
     await waitFor('[autocomplete="email"], [autocomplete="shipping email"], input[type="email"], [name="email"], #email');
     await delay(300);
     await fillSupreme(profile);
-    await maybeAutoSubmit(profile);
+    await maybeAutoSubmit(profile, data.activeProfile);
   }
 
   run();
