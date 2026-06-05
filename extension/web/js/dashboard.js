@@ -230,8 +230,13 @@ function showDashboardGate() {
           Already activated? Your license may have expired or been revoked.
           Re-enter your key in the popup to re-activate.
         </p>
-        <p style="font-size:11px;color:#7a6f56">
+        <p style="font-size:11px;color:#7a6f56;margin-bottom:24px">
           Lost your key? <a href="https://finest-license-server-production.up.railway.app/recover" target="_blank" style="color:#c9a84c;text-decoration:none">Recover it →</a>
+        </p>
+        <p style="font-size:10px;color:#3a3530">
+          <a href="https://finest-license-server-production.up.railway.app/privacy" target="_blank" style="color:#3a3530">Privacy Policy</a>
+          &nbsp;·&nbsp;
+          <a href="https://finest-license-server-production.up.railway.app/terms" target="_blank" style="color:#3a3530">Terms of Service</a>
         </p>
       </div>
     </div>`;

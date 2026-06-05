@@ -166,7 +166,12 @@ async function sendKeyEmail(toEmail, key) {
       <p style="color:#f0e6c8;font-size:13px;margin-bottom:16px">Enter this key in the extension popup to activate.</p>
       ${downloadSection}
       <hr style="border:none;border-top:1px solid #252525;margin:28px 0"/>
-      <p style="color:#3a3530;font-size:11px">Questions? Reply to this email.<br/>Finest Tools — Only the finest.</p>
+      <p style="color:#3a3530;font-size:11px;margin-bottom:10px">Questions? Reply to this email.<br/>Finest Tools — Only the finest.</p>
+      <p style="color:#2a2520;font-size:10px;line-height:1.5">
+        <a href="https://finest-license-server-production.up.railway.app/privacy" style="color:#3a3530;text-decoration:underline">Privacy</a> &nbsp;·&nbsp;
+        <a href="https://finest-license-server-production.up.railway.app/terms" style="color:#3a3530;text-decoration:underline">Terms</a> &nbsp;·&nbsp;
+        <a href="https://finest-license-server-production.up.railway.app/unsubscribe?key=${encodeURIComponent(key)}" style="color:#3a3530;text-decoration:underline">Unsubscribe from broadcasts</a>
+      </p>
     </div>`;
 
   try {
@@ -975,6 +980,200 @@ app.get('/recover', (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// GET /unsubscribe — opt out of broadcast emails (one-click via email link)
+// ─────────────────────────────────────────────
+app.get('/unsubscribe', (req, res) => {
+  const key  = (req.query.key || '').toString().toUpperCase();
+  const undo = req.query.undo === '1';
+  let result = 'missing';
+
+  if (key && key.startsWith('FINEST-')) {
+    const keys = loadKeys();
+    if (keys[key]) {
+      if (undo) {
+        delete keys[key].broadcastOptOut;
+        saveKeys(keys);
+        console.log(`[Unsubscribe] ${key} re-subscribed`);
+        result = 'resubscribed';
+      } else {
+        keys[key].broadcastOptOut = true;
+        saveKeys(keys);
+        console.log(`[Unsubscribe] ${key} opted out`);
+        result = 'ok';
+      }
+    } else {
+      result = 'notfound';
+    }
+  }
+
+  const body =
+    result === 'ok'           ? `<p class="ok">✓ Unsubscribed.</p><p>You won't receive any more broadcast emails. You'll still get critical account emails (license recovery, account changes).</p><p><a href="/unsubscribe?key=${encodeURIComponent(key)}&undo=1">Changed your mind? Re-subscribe.</a></p>` :
+    result === 'resubscribed' ? `<p class="ok">✓ Re-subscribed.</p><p>You'll receive Finest Checkouts update emails again.</p>` :
+    result === 'notfound'     ? `<p class="err">Key not recognized.</p><p>The link may be malformed. Reply to a past Finest email if this seems wrong.</p>` :
+                                `<p class="err">Missing key.</p>`;
+
+  res.send(`<!DOCTYPE html><html><head><title>Unsubscribe — Finest Checkouts</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:#080808;color:#f0e6c8;font-family:monospace;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;}
+    .brand{color:#c9a84c;font-size:18px;font-weight:800;letter-spacing:0.1em;margin-bottom:24px;}
+    p{font-size:14px;line-height:1.6;color:#c8bfaa;max-width:400px;margin-bottom:16px;}
+    .ok{color:#7ec98a;font-weight:700;}
+    .err{color:#c06060;font-weight:700;}
+    a{color:#c9a84c;}
+  </style></head><body><div>
+    <div class="brand">FINEST CHECKOUTS</div>
+    ${body}
+  </div></body></html>`);
+});
+
+// RFC 8058 one-click unsubscribe — Gmail/Outlook POST to the List-Unsubscribe URL
+app.post('/unsubscribe', (req, res) => {
+  const key = (req.query.key || '').toString().toUpperCase();
+  if (key && key.startsWith('FINEST-')) {
+    const keys = loadKeys();
+    if (keys[key]) {
+      keys[key].broadcastOptOut = true;
+      saveKeys(keys);
+      console.log(`[Unsubscribe] ${key} opted out (one-click)`);
+    }
+  }
+  res.json({ ok: true });
+});
+
+// ─────────────────────────────────────────────
+// GET /privacy — Privacy Policy
+// ─────────────────────────────────────────────
+app.get('/privacy', (req, res) => {
+  res.send(legalPage('Privacy Policy', `
+    <p><strong>Last updated:</strong> ${new Date().toISOString().slice(0, 10)}</p>
+
+    <h2>What we collect</h2>
+    <p>To operate Finest Checkouts, we store the following on our server:</p>
+    <ul>
+      <li>Your email address (for account identification, license recovery, and update announcements)</li>
+      <li>Your Discord username and Discord user ID (if you signed up via Discord OAuth)</li>
+      <li>Your license key, its status, and timestamps (created, last seen, last validated)</li>
+      <li>Your installed extension version</li>
+    </ul>
+
+    <h2>What we DO NOT collect</h2>
+    <p>The extension fills checkout forms using profile data you create. <strong>This profile data — your name, address, phone number, credit card number, expiry, CVV, name on card — is stored only in your browser's local storage on your own device. It is never transmitted to our servers. We never see it.</strong></p>
+
+    <h2>Third parties</h2>
+    <ul>
+      <li><strong>Discord:</strong> If you sign in via Discord, we receive your username, user ID, and email through Discord's OAuth API.</li>
+      <li><strong>Whop:</strong> If you purchase via Whop, Whop sends us your email and a user ID via webhook.</li>
+      <li><strong>Resend:</strong> We use Resend to send license emails and broadcasts. Your email passes through Resend.</li>
+      <li><strong>Railway:</strong> Our server runs on Railway.</li>
+    </ul>
+
+    <h2>What we do with your data</h2>
+    <ul>
+      <li>Identify you and validate your license</li>
+      <li>Send you your license key, account-related notices, and feature update announcements</li>
+      <li>Recover your key if you lose it</li>
+    </ul>
+    <p>We do not sell your data. We do not run ads. We do not share data with third parties beyond what is described above.</p>
+
+    <h2>Email opt-out</h2>
+    <p>Every broadcast email has an unsubscribe link. Click it to stop receiving update announcements. You'll still receive critical account emails (license recovery, account changes).</p>
+
+    <h2>Deletion</h2>
+    <p>To delete your account and all server-side data, email us. Your license will be revoked and your record removed.</p>
+
+    <h2>Contact</h2>
+    <p>Reply to any email from Finest Checkouts.</p>
+  `));
+});
+
+// ─────────────────────────────────────────────
+// GET /terms — Terms of Service
+// ─────────────────────────────────────────────
+app.get('/terms', (req, res) => {
+  res.send(legalPage('Terms of Service', `
+    <p><strong>Last updated:</strong> ${new Date().toISOString().slice(0, 10)}</p>
+
+    <h2>What Finest Checkouts is</h2>
+    <p>Finest Checkouts is a Chrome browser extension that fills checkout forms using profile data you provide. Optionally, it can also automatically submit those forms ("Auto-Checkout") on supported sites.</p>
+
+    <h2>Affiliations</h2>
+    <p>Finest Checkouts is <strong>not affiliated with, endorsed by, or sponsored by</strong> any of the brands or retailers it works on, including but not limited to Supreme, Nike, Adidas, Finish Line, JD Sports, Shopify, BAPE, Kith, Stussy, Palace, Waitwhile, or any other listed site.</p>
+
+    <h2>Auto-Checkout — at your own risk</h2>
+    <p>The Auto-Checkout feature, when enabled by you, will automatically click the "Place Order" / "Pay Now" button on a checkout page after filling your information. This means <strong>real purchases may be placed automatically, charging real money to the payment method you have configured</strong>.</p>
+    <p>By enabling Auto-Checkout you acknowledge that:</p>
+    <ul>
+      <li>You are solely responsible for what is in your shopping cart at any time</li>
+      <li>You are solely responsible for the payment method configured in your profile</li>
+      <li>We are not liable for any purchase placed via Auto-Checkout, accidental or otherwise</li>
+      <li>We are not liable for refund disputes with the retailer</li>
+      <li>You disable the feature when you do not want it to fire</li>
+    </ul>
+    <p>To prevent surprise charges, Auto-Checkout automatically turns itself off after each submission. You must explicitly re-enable it to use it again.</p>
+
+    <h2>Acceptable use</h2>
+    <p>You may not:</p>
+    <ul>
+      <li>Resell, share, or distribute your license key</li>
+      <li>Reverse-engineer the extension to bypass licensing</li>
+      <li>Use the extension to violate any retailer's terms of service in a way that creates legal liability for us</li>
+    </ul>
+    <p>We reserve the right to revoke licenses that violate these terms.</p>
+
+    <h2>No warranties</h2>
+    <p>The extension is provided "as is" without warranties of any kind. Retailers change their websites without notice; fills and Auto-Checkout may break temporarily as a result. We do our best to keep things working but cannot guarantee uptime, success rates, or compatibility with any specific site at any specific time.</p>
+
+    <h2>Limitation of liability</h2>
+    <p>To the maximum extent permitted by law, we are not liable for any direct, indirect, incidental, or consequential damages arising from your use of the extension, including but not limited to lost drops, missed releases, sold-out items, accidental purchases, or chargebacks.</p>
+
+    <h2>Refunds</h2>
+    <p>License purchases are handled by Whop (whop.com) or Discord. Refunds are subject to those platforms' policies. Contact the platform of purchase for refund requests.</p>
+
+    <h2>Changes to these terms</h2>
+    <p>We may update these terms. Continued use of the extension after an update constitutes acceptance of the new terms.</p>
+
+    <h2>Contact</h2>
+    <p>Reply to any email from Finest Checkouts.</p>
+  `));
+});
+
+// Shared helper for rendering a clean legal page
+function legalPage(title, bodyHtml) {
+  return `<!DOCTYPE html><html><head><title>${title} — Finest Checkouts</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:#080808;color:#c8bfaa;font-family:monospace;line-height:1.6;padding:48px 24px;}
+    .wrap{max-width:680px;margin:0 auto;}
+    .brand{color:#c9a84c;font-size:18px;font-weight:800;letter-spacing:0.1em;margin-bottom:8px;}
+    .sub{color:#7a6f56;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:36px;}
+    h1{color:#f0e6c8;font-size:24px;margin-bottom:20px;}
+    h2{color:#c9a84c;font-size:14px;letter-spacing:0.06em;text-transform:uppercase;margin-top:32px;margin-bottom:12px;}
+    p{font-size:14px;margin-bottom:14px;}
+    ul{font-size:14px;margin-bottom:14px;padding-left:24px;}
+    li{margin-bottom:6px;}
+    strong{color:#f0e6c8;}
+    a{color:#c9a84c;}
+    .footer{margin-top:48px;padding-top:24px;border-top:1px solid #1e1e1e;font-size:12px;color:#555;}
+    .footer a{color:#7a6f56;margin-right:16px;text-decoration:none;}
+    .footer a:hover{color:#c9a84c;}
+  </style></head>
+  <body><div class="wrap">
+    <div class="brand">FINEST CHECKOUTS</div>
+    <div class="sub">${title}</div>
+    <h1>${title}</h1>
+    ${bodyHtml}
+    <div class="footer">
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/terms">Terms of Service</a>
+      <a href="/recover">Recover Key</a>
+      <a href="/add-email">Add Email</a>
+    </div>
+  </div></body></html>`;
+}
+
+// ─────────────────────────────────────────────
 // POST /broadcast  (admin — send update email to all users)
 // ─────────────────────────────────────────────
 app.post('/broadcast', async (req, res) => {
@@ -1053,34 +1252,63 @@ app.post('/broadcast', async (req, res) => {
       </p>
 
       <hr style="border:none;border-top:1px solid #1e1e1e;margin:28px 0"/>
-      <p style="color:#3a3530;font-size:11px">Questions? Reply to this email.<br/>Finest Checkouts — Only the finest.</p>
+      <p style="color:#3a3530;font-size:11px;margin-bottom:10px">Questions? Reply to this email.<br/>Finest Checkouts — Only the finest.</p>
+      <p style="color:#2a2520;font-size:10px;line-height:1.5">
+        <a href="https://finest-license-server-production.up.railway.app/unsubscribe?key=__KEY__" style="color:#3a3530;text-decoration:underline">Unsubscribe from update emails</a> &nbsp;·&nbsp;
+        <a href="https://finest-license-server-production.up.railway.app/privacy" style="color:#3a3530;text-decoration:underline">Privacy</a> &nbsp;·&nbsp;
+        <a href="https://finest-license-server-production.up.railway.app/terms" style="color:#3a3530;text-decoration:underline">Terms</a>
+      </p>
     </div>`;
 
-  const emails = [...new Set(
-    Object.values(keys)
-      .map(r => r.email)
-      .filter(e => e && e !== 'manual' && e !== 'unknown' && e.includes('@'))
-  )];
+  // Iterate active keys (not unique emails) so each recipient gets a personalised
+  // unsubscribe link tied to their specific key. Skip opted-out users.
+  const recipients = Object.entries(keys).filter(
+    ([, r]) => r.status === 'active'
+            && r.email && r.email !== 'manual' && r.email !== 'unknown' && r.email.includes('@')
+            && !r.broadcastOptOut
+  );
+  // Dedupe by email (a user with multiple active keys gets one email)
+  const seenEmails = new Set();
+  const dedupedRecipients = recipients.filter(([key, r]) => {
+    const e = r.email.toLowerCase();
+    if (seenEmails.has(e)) return false;
+    seenEmails.add(e);
+    return true;
+  });
 
-  let sent = 0, failed = 0;
-  for (const email of emails) {
+  let sent = 0, failed = 0, skipped = 0;
+  // Track how many were opted out (for the response)
+  const optedOutCount = Object.values(keys).filter(r => r.status === 'active' && r.broadcastOptOut).length;
+
+  for (const [key, record] of dedupedRecipients) {
     try {
+      // Personalise the unsubscribe link with this recipient's key
+      const personalised = html.replace(/__KEY__/g, encodeURIComponent(key));
       const r = await fetch('https://api.resend.com/emails', {
         method:  'POST',
         headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: FROM_EMAIL, to: [email], subject: `Finest Checkouts v${version} — In-store waitlist auto-booking + checkout upgrades`, html }),
+        body: JSON.stringify({
+          from: FROM_EMAIL,
+          to: [record.email],
+          subject: `Finest Checkouts v${version} — In-store waitlist auto-booking + checkout upgrades`,
+          html: personalised,
+          headers: {
+            // CAN-SPAM / RFC 8058 — one-click list unsubscribe header for Gmail/Outlook
+            'List-Unsubscribe': `<https://finest-license-server-production.up.railway.app/unsubscribe?key=${encodeURIComponent(key)}>`,
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+          },
+        }),
       });
-      if (r.ok) { sent++; console.log(`[Broadcast] Sent to ${email}`); }
-      else { failed++; console.error(`[Broadcast] Failed ${email}:`, await r.text()); }
+      if (r.ok) { sent++; console.log(`[Broadcast] Sent to ${record.email}`); }
+      else { failed++; console.error(`[Broadcast] Failed ${record.email}:`, await r.text()); }
     } catch (err) {
       failed++;
-      console.error(`[Broadcast] Error ${email}:`, err.message);
+      console.error(`[Broadcast] Error ${record.email}:`, err.message);
     }
-    // Small delay to stay within Resend rate limits
     await new Promise(r => setTimeout(r, 100));
   }
 
-  return res.json({ sent, failed, total: emails.length });
+  return res.json({ sent, failed, optedOut: optedOutCount, total: dedupedRecipients.length });
 });
 
 // ─────────────────────────────────────────────

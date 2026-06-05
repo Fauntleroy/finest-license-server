@@ -52,6 +52,11 @@ function showLicenseGate(body) {
       <div class="license-link" style="margin-top:6px">
         Lost your key? <a href="https://finest-license-server-production.up.railway.app/recover" target="_blank">Recover →</a>
       </div>
+      <div class="license-link" style="margin-top:14px;font-size:9px;color:#3a3530">
+        <a href="https://finest-license-server-production.up.railway.app/privacy" target="_blank" style="color:#3a3530">Privacy</a>
+        &nbsp;·&nbsp;
+        <a href="https://finest-license-server-production.up.railway.app/terms" target="_blank" style="color:#3a3530">Terms</a>
+      </div>
     </div>
   `;
 
