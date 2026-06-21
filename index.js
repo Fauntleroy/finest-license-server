@@ -1138,6 +1138,95 @@ app.get('/terms', (req, res) => {
   `));
 });
 
+// ─────────────────────────────────────────────
+// GET /docs/auto-checkout — Auto-Checkout user guide
+// ─────────────────────────────────────────────
+app.get('/docs/auto-checkout', (req, res) => {
+  res.send(legalPage('Auto-Checkout Guide', `
+    <p><strong>Status:</strong> BETA. Use at your own risk. Real card, real charge.</p>
+
+    <h2>What it does</h2>
+    <p>When Auto-Checkout is on for your active profile, the moment you load a supported checkout page the extension:</p>
+    <ul>
+      <li>Fills your shipping, billing, and payment info</li>
+      <li>Waits for the secure card iframe to finish filling</li>
+      <li><strong>Clicks the Pay button automatically</strong> — no confirmation, no preview</li>
+    </ul>
+    <p>End result: order placed without you touching the page.</p>
+
+    <h2>What it doesn't do</h2>
+    <ul>
+      <li>It does <strong>not</strong> click "Add to Cart" or pick sizes. Your cart has to already have the item you want.</li>
+      <li>It does <strong>not</strong> apply discount codes. Apply them before the checkout step.</li>
+      <li>It does <strong>not</strong> work on every site. Supported in v2.2.4: <strong>Supreme (online)</strong>. More to come.</li>
+    </ul>
+
+    <h2>How to turn it on</h2>
+    <p>Three places to toggle Auto-Checkout. All three control the same setting on whichever profile is <strong>active</strong>.</p>
+    <ul>
+      <li><strong>Popup</strong> — click the Finest icon, scroll to the toggles, flip "Auto-Checkout (SUPREME · BETA)"</li>
+      <li><strong>Dashboard → Profiles page</strong> — under your profile cards, there's a ⚡ Auto-Checkout section with a toggle</li>
+      <li><strong>Dashboard → edit any profile</strong> — at the bottom of the editor</li>
+    </ul>
+    <p>The toggle is <strong>per profile</strong>. Profile A can have Auto-Checkout on, Profile B can have it off. Whichever profile is your active one is what fires on checkout.</p>
+
+    <h2>The "ARE YOU SURE ABOUT THAT?" chain</h2>
+    <p>Flipping Auto-Checkout ON kicks off a multi-step confirmation. You have to walk through it every single time you enable it. Not optional, not skippable.</p>
+    <ul>
+      <li><strong>Cancel anywhere on step 1</strong> → toggle goes back off, no harm done</li>
+      <li><strong>Click through to the end</strong> → Auto-Checkout is armed</li>
+    </ul>
+    <p>The chain is intentional. It exists so you can't muscle-memory click your way into accidentally arming this. Read it.</p>
+
+    <h2>What happens after a successful order</h2>
+    <p><strong>Auto-Checkout automatically turns itself OFF after every completed order.</strong> This is non-optional. The intent is: one armed Auto-Checkout = one order. If you want it to fire on a second order, you have to flip it on again (and walk through the warning chain again).</p>
+    <p>This is the safety net. If you forget to disable it from yesterday's drop, you won't accidentally buy something today — because yesterday's order already disabled it.</p>
+
+    <h2>Recommended workflow for a drop</h2>
+    <ul>
+      <li><strong>The night before</strong> — make sure your profile has the right payment info, address, etc. Test the fill on a non-Supreme site if you want to be sure your profile is right.</li>
+      <li><strong>Add the item to your cart manually.</strong> Pick the size yourself. Double-check the cart total.</li>
+      <li><strong>Open the checkout page in a new tab</strong> but do NOT load it yet.</li>
+      <li><strong>Open the Finest popup → flip Auto-Checkout on.</strong> Walk through the warning chain.</li>
+      <li><strong>Refresh / load the checkout page.</strong> Watch the gold overlay in the top-right corner.</li>
+      <li><strong>Done.</strong> Toggle is auto-off, you can close the tab.</li>
+    </ul>
+
+    <h2>What if it doesn't fire?</h2>
+    <p>Watch the overlay. It'll tell you exactly where it got stuck.</p>
+    <ul>
+      <li><strong>"Pay button not found within 10s"</strong> — Supreme changed their layout. Click Pay manually for this order and let us know via your licence email.</li>
+      <li><strong>"Button became invalid before click"</strong> — Supreme re-rendered the page mid-click. Refresh and try again.</li>
+      <li><strong>No overlay at all</strong> — Auto-Checkout might not be on. Check the popup toggle.</li>
+      <li><strong>Overlay says "clicked" but nothing happened</strong> — Shopify's React handler swallowed the synthetic click. The extension has fallback methods that usually catch this. If they didn't, click manually.</li>
+    </ul>
+
+    <h2>Things the warning chain isn't joking about</h2>
+    <ul>
+      <li><strong>Wrong size in your cart?</strong> Auto-Checkout buys the wrong size. We don't validate.</li>
+      <li><strong>Forgot to disable it from yesterday?</strong> Auto-Checkout fires on the next checkout you load. (Mitigated by the auto-off-after-purchase safety, but still.)</li>
+      <li><strong>On the wrong profile?</strong> Auto-Checkout uses whichever profile is active. Active ≠ what you used last drop, necessarily.</li>
+    </ul>
+    <p>The warning chain is the only thing standing between you and a Supreme x Magic Eraser 4-pack you didn't actually want.</p>
+
+    <h2>Disabling</h2>
+    <p>You can disable Auto-Checkout the same three places you enable it. No warning chain on disable — one click and it's off.</p>
+
+    <h2>Coverage / support</h2>
+    <ul>
+      <li><strong>Supreme (online — us.supreme.com)</strong> ✅</li>
+      <li>Finish Line / JD Sports — fills work, Auto-Checkout pending</li>
+      <li>Shopify checkouts (Kith, BAPE, Palace, etc.) — fills work, Auto-Checkout pending</li>
+      <li>Nike, Adidas, etc. — fills work, Auto-Checkout pending</li>
+    </ul>
+    <p>We're rolling out one site at a time. Each site needs its own pay-button detection logic and we'd rather get it right than ship broken on everything.</p>
+
+    <h2>Refunds, returns, chargebacks</h2>
+    <p>Auto-Checkout completes purchases on third-party sites (Supreme). Returns and refunds are handled by <strong>Supreme</strong>, not by us. Same as if you'd clicked Pay yourself.</p>
+    <p>We are not affiliated with Supreme. We do not have access to your orders. We can't cancel orders for you. <strong>Once Auto-Checkout fires, the order is between you and the retailer.</strong></p>
+  `));
+});
+
 // Shared helper for rendering a clean legal page
 function legalPage(title, bodyHtml) {
   return `<!DOCTYPE html><html><head><title>${title} — Finest Checkouts</title>
@@ -1182,46 +1271,59 @@ app.post('/broadcast', async (req, res) => {
   if (!RESEND_API_KEY) return res.status(500).json({ error: 'RESEND_API_KEY not set' });
 
   const keys    = loadKeys();
-  const version = process.env.CURRENT_VERSION || '2.2.3';
+  const version = process.env.CURRENT_VERSION || '2.2.4';
   const downloadUrl = EXTENSION_DOWNLOAD_URL || '#';
+  const SERVER = 'https://finest-license-server-production.up.railway.app';
 
   const html = `
     <div style="background:#080808;padding:40px 32px;max-width:520px;margin:0 auto;font-family:monospace">
       <div style="color:#c9a84c;font-size:20px;font-weight:700;letter-spacing:0.1em;margin-bottom:8px">FINEST CHECKOUTS</div>
-      <div style="color:#6a6050;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:28px">v${version} — In-Store + Online Upgrades</div>
+      <div style="color:#6a6050;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:28px">v${version} — Auto-Checkout (BETA)</div>
 
-      <p style="color:#f0e6c8;font-size:15px;font-weight:700;margin-bottom:12px">Two big things this drop.</p>
+      <p style="color:#f0e6c8;font-size:16px;font-weight:700;margin-bottom:12px">The big one.</p>
 
-      <p style="color:#c8bfaa;font-size:13px;margin-bottom:24px">Click <strong style="color:#c9a84c">Apply Now</strong> in the popup to get everything — no re-downloading needed.</p>
+      <p style="color:#c8bfaa;font-size:13px;margin-bottom:24px">If you've been waiting on hands-free Supreme drops, this is the release. Click <strong style="color:#c9a84c">Apply Now</strong> in the popup to grab the script-level updates. The new UI (the Auto-Checkout toggle, the warning chain, the dashboard layout) only ships in the full zip — re-download to get the toggles.</p>
 
       <div style="background:#181818;border-left:3px solid #c9a84c;padding:16px 20px;margin-bottom:18px">
-        <p style="color:#c9a84c;font-size:13px;font-weight:700;letter-spacing:0.08em;margin:0 0 12px">🏪 NEW: IN-STORE WAITLIST AUTO-BOOKING</p>
-        <p style="color:#f0e6c8;font-size:13px;line-height:1.6;margin:0 0 8px">Drop morning, skip the manual scramble. Finest now auto-books your Supreme in-store appointment on Waitwhile the second registration opens.</p>
+        <p style="color:#c9a84c;font-size:13px;font-weight:700;letter-spacing:0.08em;margin:0 0 12px">🚀 NEW: AUTO-CHECKOUT (BETA) — SUPREME ONLY</p>
+        <p style="color:#f0e6c8;font-size:13px;line-height:1.6;margin:0 0 8px">Flip the toggle on, walk through the warning chain (it's there for a reason, read it), and the next Supreme checkout you load gets:</p>
         <ul style="color:#c8bfaa;font-size:12px;margin:8px 0 0;padding-left:18px;line-height:1.7">
-          <li>Picks your preferred store automatically</li>
-          <li>Grabs the earliest available slot</li>
-          <li>Fills name, email, phone and hits submit</li>
-          <li>Auto-retries if a slot gets sniped — keeps going until you're in or the line closes</li>
-          <li>Supreme Brooklyn, Chicago, Manhattan, San Francisco, LA &amp; Miami</li>
+          <li>Filled with your active profile's info</li>
+          <li>Card iframe filled</li>
+          <li><strong>Pay button clicked automatically</strong></li>
         </ul>
-        <p style="color:#7a6f56;font-size:11px;margin:12px 0 0;font-style:italic">Toggle on in Dashboard → Settings → Waitlist Auto-Booking. Pick your store and let it rip Tuesday morning.</p>
+        <p style="color:#f0e6c8;font-size:12px;line-height:1.6;margin:12px 0 0">Auto-Checkout turns itself OFF after each completed order so you don't accidentally double-buy. You have to re-arm it on purpose every time.</p>
+        <p style="color:#7a6f56;font-size:11px;margin:12px 0 0;font-style:italic">Three places to toggle: popup, dashboard Profiles page, or inside the profile editor.</p>
+        <p style="margin:14px 0 0">
+          <a href="${SERVER}/docs/auto-checkout" style="color:#c9a84c;font-size:12px;font-weight:700">Read the full guide →</a>
+        </p>
+      </div>
+
+      <div style="background:#181818;border-left:3px solid #c9a84c;padding:16px 20px;margin-bottom:18px">
+        <p style="color:#c9a84c;font-size:13px;font-weight:700;letter-spacing:0.08em;margin:0 0 12px">🏪 IN-STORE AUTO-BOOKING — IMPROVEMENTS</p>
+        <p style="color:#f0e6c8;font-size:13px;line-height:1.6;margin:0">The Supreme Waitlist auto-booker keeps getting better:</p>
+        <ul style="color:#c8bfaa;font-size:12px;margin:8px 0 0;padding-left:18px;line-height:1.7">
+          <li>Cleaner overlay messages so you know what step it's on</li>
+          <li>Auto-retry when slots get sniped</li>
+          <li>Auto-stop when registration closes</li>
+          <li>Settings moved to the Profiles page — no more digging</li>
+        </ul>
+        <p style="color:#7a6f56;font-size:11px;margin:12px 0 0;font-style:italic">Drop morning, set your store, sit back.</p>
       </div>
 
       <div style="background:#181818;border-left:3px solid #c9a84c;padding:16px 20px;margin-bottom:24px">
-        <p style="color:#c9a84c;font-size:13px;font-weight:700;letter-spacing:0.08em;margin:0 0 12px">⚡ CHECKOUT IMPROVEMENTS</p>
-        <p style="color:#f0e6c8;font-size:13px;line-height:1.6;margin:0">Better fills, fewer hangs, and improved support across the sites you actually buy on:</p>
-        <ul style="color:#c8bfaa;font-size:12px;margin:8px 0 0;padding-left:18px;line-height:1.7">
-          <li><strong>Finish Line &amp; JD Sports</strong> — faster card/CVV fill on first visit</li>
-          <li><strong>Supreme (online)</strong> — dropdown crash fix on the new checkout</li>
-          <li><strong>Shopify-powered stores</strong> — Kith, BAPE, Stussy, Palace, Awake, Brain Dead, Pleasures, Carrots, Madhappy, Aimé Leon Dore, Bodega, Concepts, Extra Butter, Union LA, and thousands more</li>
-          <li><strong>SPA checkouts</strong> — Nike, JD now wait properly for fields to render before filling</li>
+        <p style="color:#c9a84c;font-size:13px;font-weight:700;letter-spacing:0.08em;margin:0 0 12px">⚙ QUALITY-OF-LIFE</p>
+        <ul style="color:#c8bfaa;font-size:12px;margin:0;padding-left:18px;line-height:1.7">
+          <li><strong>"Lost your key?" link</strong> in the popup and dashboard — self-serve recovery</li>
+          <li><strong>Multi-profile per device, multiple devices per key</strong> — same licence works everywhere</li>
+          <li><strong>Privacy / Terms / Unsubscribe</strong> pages now linked from every email and the popup footer</li>
         </ul>
       </div>
 
-      <div style="background:#1a1400;border:1px solid #7a5e1e;border-radius:6px;padding:14px 18px;margin-bottom:20px">
-        <p style="color:#c9a84c;font-size:12px;font-weight:700;letter-spacing:0.08em;margin:0 0 8px">⚠ RUNNING v2.1 OR EARLIER? READ THIS</p>
-        <p style="color:#e8c878;font-size:12px;line-height:1.6;margin:0">
-          One-time re-install required. v2.1 didn't have the auto-update system, so you'll need to download the new zip below and load it fresh. After this, future updates (like the next checkout improvement or supported site) apply with a single <strong>Apply Now</strong> click in the popup — no more re-installs.
+      <div style="background:#2a0a0a;border:1px solid #7a1e1e;border-radius:6px;padding:14px 18px;margin-bottom:24px">
+        <p style="color:#e89898;font-size:12px;font-weight:700;letter-spacing:0.08em;margin:0 0 8px">💡 HEADS UP — AUTO-CHECKOUT IS BETA</p>
+        <p style="color:#e8b0b0;font-size:12px;line-height:1.6;margin:0">
+          Auto-Checkout will spend your money. The warning chain is intentional. Read it every time. <a href="${SERVER}/docs/auto-checkout" style="color:#f0c0c0;text-decoration:underline">The guide</a> walks through the safe workflow for drops.
         </p>
       </div>
 
@@ -1229,7 +1331,7 @@ app.post('/broadcast', async (req, res) => {
         <a href="${downloadUrl}" style="background:#c9a84c;color:#080808;padding:12px 28px;border-radius:5px;text-decoration:none;font-weight:700;font-family:monospace;font-size:14px">Download v${version}</a>
       </p>
       <p style="color:#7a6f56;font-size:11px;margin:8px 0 24px">
-        On v2.2.0+? Just click <strong style="color:#c9a84c">Apply Now</strong> in the popup. Re-download only if you're switching computers, installing fresh, or want the in-store waitlist feature.
+        Already on 2.2.2+? Just click <strong style="color:#c9a84c">Apply Now</strong> in the popup for the content-script improvements. For the new BETA toggles you'll want the full zip.
       </p>
 
       <div style="background:#181818;border-radius:6px;padding:16px 20px;margin-bottom:24px">
@@ -1244,19 +1346,19 @@ app.post('/broadcast', async (req, res) => {
           <li>Select the unzipped folder you saved in step 2</li>
           <li>Click the Finest extension icon → enter your licence key → done</li>
         </ol>
-        <p style="color:#7a6f56;font-size:11px;margin:12px 0 0;font-style:italic">Your profiles are stored in Chrome, not in the extension files — re-installing won't erase them. They'll come right back once you enter your key.</p>
+        <p style="color:#7a6f56;font-size:11px;margin:12px 0 0;font-style:italic">Your profiles are stored in Chrome, not in the extension files — re-installing won't erase them.</p>
       </div>
 
       <p style="color:#7a6f56;font-size:11px;margin:0">
-        Lost your licence key? <a href="https://finest-license-server-production.up.railway.app/recover" style="color:#c9a84c;text-decoration:underline">Recover it here</a>.
+        Lost your licence key? <a href="${SERVER}/recover" style="color:#c9a84c;text-decoration:underline">Recover it here</a>.
       </p>
 
       <hr style="border:none;border-top:1px solid #1e1e1e;margin:28px 0"/>
       <p style="color:#3a3530;font-size:11px;margin-bottom:10px">Questions? Reply to this email.<br/>Finest Checkouts — Only the finest.</p>
       <p style="color:#2a2520;font-size:10px;line-height:1.5">
-        <a href="https://finest-license-server-production.up.railway.app/unsubscribe?key=__KEY__" style="color:#3a3530;text-decoration:underline">Unsubscribe from update emails</a> &nbsp;·&nbsp;
-        <a href="https://finest-license-server-production.up.railway.app/privacy" style="color:#3a3530;text-decoration:underline">Privacy</a> &nbsp;·&nbsp;
-        <a href="https://finest-license-server-production.up.railway.app/terms" style="color:#3a3530;text-decoration:underline">Terms</a>
+        <a href="${SERVER}/unsubscribe?key=__KEY__" style="color:#3a3530;text-decoration:underline">Unsubscribe from update emails</a> &nbsp;·&nbsp;
+        <a href="${SERVER}/privacy" style="color:#3a3530;text-decoration:underline">Privacy</a> &nbsp;·&nbsp;
+        <a href="${SERVER}/terms" style="color:#3a3530;text-decoration:underline">Terms</a>
       </p>
     </div>`;
 
@@ -1290,7 +1392,7 @@ app.post('/broadcast', async (req, res) => {
         body: JSON.stringify({
           from: FROM_EMAIL,
           to: [record.email],
-          subject: `Finest Checkouts v${version} — In-store waitlist auto-booking + checkout upgrades`,
+          subject: `Finest Checkouts v${version} — Auto-Checkout for Supreme drops is here`,
           html: personalised,
           headers: {
             // CAN-SPAM / RFC 8058 — one-click list unsubscribe header for Gmail/Outlook
