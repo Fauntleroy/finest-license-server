@@ -180,61 +180,204 @@
   // wait for the PCI iframe(s) to finish filling, then click the pay button.
   // After a successful submit, auto-disables the toggle so it doesn't fire on
   // a second checkout in the same session.
+  // Detect Shopify queue / waiting-room / throttle pages. We must NOT fire
+  // auto-checkout on these — repeated submit attempts + failures on queue
+  // pages contribute to fraud-detection scoring and can get the user's IP
+  // throttled by Cloudflare / Shopify.
+  function isCheckoutPage() {
+    const path = location.pathname.toLowerCase();
+    if (path.includes('queue') || path.includes('throttle') || path.includes('waiting')) return false;
+
+    // Body-text sniff for queue-style messaging
+    const body = (document.body?.innerText || '').toLowerCase();
+    const queueSignals = [
+      "you're in line", "you are in line", "waiting room", "been placed in line",
+      "high traffic", "in the queue", "your place in line", "waiting to enter",
+    ];
+    if (queueSignals.some(s => body.includes(s))) return false;
+
+    // Positive signal: standard Supreme/Shopify checkout form present
+    const hasCheckoutForm = !!document.querySelector(
+      '#form_firstName, [name="form_firstName"], [autocomplete="shipping address-line1"], [name="address1"], #checkout-pay-button, [aria-label="process payment"]'
+    );
+    return hasCheckoutForm;
+  }
+
   async function maybeAutoSubmit(profile, profileKey) {
     if (!profile?.autoCheckout) return;
 
-    // Give the PCI iframes ~2.5s to finish filling card/expiry/CVV
-    await delay(2500);
+    // Silent bail on queue/waiting pages — no overlay noise
+    if (!isCheckoutPage()) {
+      console.log('[Finest] Auto-checkout: skipped (queue / waiting room / non-checkout page)');
+      return;
+    }
 
-    // Find the pay button. Primary: Supreme's stable #checkout-pay-button id.
-    // Fallbacks for any layout variants.
+    setStatusOverlay('Auto-checkout armed. Waiting for payment fields to settle...', '#c9a84c');
+    // Wait for fill to actually complete — poll for either the email field
+    // having a value OR the pay button becoming enabled (either signals the
+    // form is populated and Shopify has validated).
+    const fillStart = Date.now();
+    while (Date.now() - fillStart < 5000) {
+      const email = document.querySelector('[autocomplete="email"], [autocomplete="shipping email"], input[type="email"]');
+      const payBtn = document.querySelector('#checkout-pay-button, [aria-label="process payment"]');
+      const emailFilled = email && email.value && email.value.length > 3;
+      const btnEnabled  = payBtn && !payBtn.disabled;
+      if (emailFilled || btnEnabled) break;
+      await delay(200);
+    }
+    // Small extra settle so the PCI iframe can also finish
+    await delay(1000);
+
     const findPayBtn = () => {
       const byId = document.querySelector('#checkout-pay-button');
-      if (byId && !byId.disabled && byId.offsetParent !== null) return byId;
+      if (byId && !byId.disabled && byId.offsetParent !== null) return { el: byId, by: '#checkout-pay-button' };
 
       const byAria = document.querySelector('[aria-label="process payment"]');
-      if (byAria && !byAria.disabled && byAria.offsetParent !== null) return byAria;
+      if (byAria && !byAria.disabled && byAria.offsetParent !== null) return { el: byAria, by: '[aria-label="process payment"]' };
 
       const byEvent = document.querySelector('[data-event-name="pay_button_inline"]');
-      if (byEvent && !byEvent.disabled && byEvent.offsetParent !== null) return byEvent;
+      if (byEvent && !byEvent.disabled && byEvent.offsetParent !== null) return { el: byEvent, by: '[data-event-name="pay_button_inline"]' };
 
-      // Last-resort text match
-      return Array.from(document.querySelectorAll('button')).find(b => {
+      const textBtn = Array.from(document.querySelectorAll('button')).find(b => {
         const t = b.textContent.trim().toLowerCase();
         return !b.disabled && b.offsetParent !== null && (
           t === 'pay now' || t === 'place order' || t === 'complete order' ||
           t.includes('pay now') || t.includes('place order')
         );
       });
+      return textBtn ? { el: textBtn, by: 'text match' } : null;
     };
 
-    // Wait up to 10s for the button to be present + enabled
+    setStatusOverlay('Looking for pay button...', '#c9a84c');
     const start = Date.now();
-    let btn = null;
+    let found = null;
     while (Date.now() - start < 10000) {
-      btn = findPayBtn();
-      if (btn) break;
+      found = findPayBtn();
+      if (found) break;
       await delay(250);
     }
 
-    if (!btn) {
+    if (!found) {
+      setStatusOverlay('❌ Pay button not found within 10s. Click manually to complete.', '#c06060');
       console.log('[Finest] Auto-checkout: pay button not found within 10s.');
       return;
     }
 
-    // Small natural delay so we don't fire on the same animation frame as the fill
+    setStatusOverlay(`Pay button found via ${found.by}. Clicking in 200ms...`, '#e8b04c');
     await delay(150 + Math.random() * 200);
-    btn.click();
-    console.log('[Finest] Auto-checkout: pay button clicked.');
 
-    // Safety: disable autoCheckout immediately so any subsequent checkout in
-    // this session won't auto-submit until the user explicitly re-enables it.
+    // Sanity: verify button is still in DOM and clickable right before clicking
+    const stillValid = document.contains(found.el) && !found.el.disabled;
+    if (!stillValid) {
+      setStatusOverlay('⚠ Button became invalid before click. Try manually.', '#c06060');
+      return;
+    }
+
+    // Robust click: dispatch a full pointer/mouse event sequence so React's
+    // synthetic event system picks it up, then call .click(), then fall back to
+    // submitting the parent form directly if React handlers swallowed the click.
+    fireRealClick(found.el);
+    setStatusOverlay('✅ Pay button clicked. Watching for response...', '#7ec98a');
+    console.log('[Finest] Auto-checkout: pay button clicked via', found.by);
+
     await disableAutoCheckoutAfterPurchase(profileKey);
-
-    // Watch for the order confirmation page and show a popup overlay if we land
-    // there. If not, the order may have failed — we already disabled, so the
-    // user can decide what to do.
     watchForConfirmation();
+  }
+
+  // Multi-method click: maximizes the chance Shopify's React handlers fire.
+  // Tries DOM events, native .click(), form.requestSubmit, and finally —
+  // injects a script into the page's MAIN world to call React's onClick directly.
+  function fireRealClick(el) {
+    try {
+      el.scrollIntoView({ block: 'center', behavior: 'instant' });
+    } catch {}
+
+    const rect = el.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    const opts = {
+      bubbles: true, cancelable: true, composed: true,
+      clientX: x, clientY: y, screenX: x, screenY: y,
+      button: 0, buttons: 1, view: window,
+    };
+
+    // Pointer + mouse event sequence
+    try {
+      el.dispatchEvent(new PointerEvent('pointerdown', { ...opts, pointerType: 'mouse', isPrimary: true }));
+      el.dispatchEvent(new PointerEvent('pointerup',   { ...opts, pointerType: 'mouse', isPrimary: true, buttons: 0 }));
+    } catch {}
+    el.dispatchEvent(new MouseEvent('mousedown', opts));
+    el.dispatchEvent(new MouseEvent('mouseup',   { ...opts, buttons: 0 }));
+    el.dispatchEvent(new MouseEvent('click',     { ...opts, buttons: 0 }));
+
+    try { el.click(); } catch {}
+
+    try {
+      const form = el.closest('form');
+      if (form && typeof form.requestSubmit === 'function') form.requestSubmit(el);
+    } catch {}
+
+    // NUCLEAR FALLBACK: inject a script that runs in the page's main world.
+    // From there it can find React's fiber properties and call onClick directly,
+    // bypassing any isTrusted check in the synthetic event path.
+    try {
+      const s = document.createElement('script');
+      s.textContent = `(() => {
+        const btn = document.querySelector('#checkout-pay-button')
+          || document.querySelector('[aria-label="process payment"]')
+          || document.querySelector('[data-event-name="pay_button_inline"]');
+        if (!btn) return;
+        // Find React's internal props key — it changes per React version
+        const propsKey = Object.keys(btn).find(k => k.startsWith('__reactProps'));
+        const fiberKey = Object.keys(btn).find(k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'));
+        if (propsKey && btn[propsKey]) {
+          const p = btn[propsKey];
+          // Try the common handler names
+          const handler = p.onClick || p.onTap || p.onSubmit;
+          if (typeof handler === 'function') {
+            try { handler({ preventDefault: () => {}, stopPropagation: () => {}, currentTarget: btn, target: btn, type: 'click' }); } catch (e) { console.warn('[Finest:main] handler threw:', e); }
+          }
+        }
+        // Also walk up the fiber tree for parent onSubmit (form-level handler)
+        if (fiberKey && btn[fiberKey]) {
+          let f = btn[fiberKey].return;
+          let hops = 0;
+          while (f && hops < 8) {
+            const ps = f.memoizedProps || f.pendingProps;
+            if (ps && typeof ps.onSubmit === 'function') {
+              try { ps.onSubmit({ preventDefault: () => {}, stopPropagation: () => {}, currentTarget: f.stateNode, target: btn, type: 'submit' }); break; } catch (e) {}
+            }
+            f = f.return; hops++;
+          }
+        }
+      })();`;
+      (document.head || document.documentElement).appendChild(s);
+      s.remove();
+    } catch (e) {
+      console.warn('[Finest] React handler injection failed:', e);
+    }
+  }
+
+  // Persistent on-page status overlay so the user can see auto-checkout progress
+  function setStatusOverlay(message, color) {
+    let div = document.getElementById('finest-checkout-status');
+    if (!div) {
+      div = document.createElement('div');
+      div.id = 'finest-checkout-status';
+      div.style.cssText = `
+        position: fixed; top: 20px; right: 20px; z-index: 999999;
+        background: #080808; padding: 12px 16px;
+        border-radius: 6px; font-family: monospace; font-size: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        max-width: 320px; line-height: 1.5;
+        transition: border-color 0.2s, color 0.2s;
+      `;
+      document.body.appendChild(div);
+    }
+    const c = color || '#c9a84c';
+    div.style.border = '1px solid ' + c;
+    div.style.color = c;
+    div.innerHTML = `<div style="font-weight:700;margin-bottom:4px">⚡ Finest Auto-Checkout</div><div style="color:#c8bfaa;font-size:11px">${message}</div>`;
   }
 
   async function disableAutoCheckoutAfterPurchase(profileKey) {
@@ -273,19 +416,24 @@
   }
 
   function showPurchaseOverlay() {
-    if (document.getElementById('finest-purchase-overlay')) return;
-    const div = document.createElement('div');
-    div.id = 'finest-purchase-overlay';
-    div.style.cssText = `
-      position: fixed; top: 20px; right: 20px; z-index: 999999;
-      background: #080808; color: #c9a84c;
-      padding: 14px 18px; border: 1px solid #7a5e1e; border-radius: 6px;
-      font-family: monospace; font-size: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-      max-width: 320px; line-height: 1.5;
-    `;
+    // Reuse the status overlay element if it exists, otherwise create
+    let div = document.getElementById('finest-checkout-status');
+    if (!div) {
+      div = document.createElement('div');
+      div.id = 'finest-checkout-status';
+      div.style.cssText = `
+        position: fixed; top: 20px; right: 20px; z-index: 999999;
+        background: #080808; padding: 14px 18px; border-radius: 6px;
+        font-family: monospace; font-size: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        max-width: 320px; line-height: 1.5;
+      `;
+      document.body.appendChild(div);
+    }
+    div.style.border = '1px solid #7ec98a';
+    div.style.color = '#7ec98a';
     div.innerHTML = `
-      <div style="font-weight:700;margin-bottom:6px">⚡ Finest — Purchase Submitted</div>
+      <div style="font-weight:700;margin-bottom:6px">✅ Finest — Purchase Submitted</div>
       <div style="color:#c8bfaa;font-size:11px;margin-bottom:8px">
         Auto-checkout has been turned <strong style="color:#7ec98a">OFF</strong> on this profile so you don't accidentally double-buy.
       </div>
@@ -293,9 +441,8 @@
         Re-enable from Dashboard → Profile → Auto-Checkout if you want it on for another order.
       </div>
     `;
-    document.body.appendChild(div);
     // Auto-dismiss after 30s
-    setTimeout(() => div.remove(), 30000);
+    setTimeout(() => { if (div?.parentNode) div.remove(); }, 30000);
   }
 
   // ─── Run ──────────────────────────────────────────────────────────────────
