@@ -1699,7 +1699,7 @@ app.post('/admin/assign-roles', async (req, res) => {
 // ─────────────────────────────────────────────
 app.get('/version', (req, res) => {
   res.json({
-    version:     process.env.CURRENT_VERSION || '2.2.4',
+    version:     process.env.CURRENT_VERSION || '2.2.5',
     downloadUrl: EXTENSION_DOWNLOAD_URL || null,
     scripts: {
       fnl:             `${SERVER_URL}/scripts/fnl.js`,

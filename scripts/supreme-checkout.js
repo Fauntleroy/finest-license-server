@@ -1,5 +1,11 @@
-﻿/**
- * Finest Checkouts â€” Supreme Checkout Autofill
+(async () => {
+  try {
+    const { activeScripts } = await chrome.storage.local.get('activeScripts');
+    if (activeScripts?.supremeCheckout) { eval(activeScripts.supremeCheckout); return; }
+  } catch {}
+
+/**
+ * Finest Checkouts — Supreme Checkout Autofill
  * Targets us.supreme.com new checkout (Shopify-based)
  * Fields identified by autocomplete attribute
  */
@@ -10,7 +16,7 @@
   if (window.__finestSupreme) return;
   window.__finestSupreme = true;
 
-  // US state abbreviation â†’ full name
+  // US state abbreviation → full name
   // Prevents "CA" being matched to "Canada" in country dropdowns
   const STATE_MAP = {
     'AL':'Alabama','AK':'Alaska','AZ':'Arizona','AR':'Arkansas','CA':'California',
@@ -30,7 +36,7 @@
   const delay = (ms) => new Promise(r => setTimeout(r, ms));
   const naturalDelay = () => delay(20 + Math.random() * 30);
 
-  // â”€â”€â”€ React-safe setter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── React-safe setter ────────────────────────────────────────────────────
   function reactSet(el, value) {
     if (!el || value == null) return;
     const proto = el.tagName === 'SELECT'
@@ -39,7 +45,7 @@
     const desc = Object.getOwnPropertyDescriptor(proto, 'value');
     if (desc && desc.set) desc.set.call(el, value);
     else el.value = value;
-    // React 18 listens to input + keydown on this checkout â€” fire those only.
+    // React 18 listens to input + keydown on this checkout — fire those only.
     // Do NOT fire blur/focus here; focusFill handles focus lifecycle natively.
     el.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true }));
     el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'a', code: 'KeyA' }));
@@ -69,7 +75,7 @@
     return false;
   }
 
-  // â”€â”€â”€ Wait for element â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Wait for element ─────────────────────────────────────────────────────
   function waitFor(selector, timeout = 10000) {
     return new Promise((resolve) => {
       const el = document.querySelector(selector);
@@ -83,7 +89,7 @@
     });
   }
 
-  // â”€â”€â”€ Get by autocomplete attribute (Supreme's new checkout uses these) â”€â”€â”€â”€
+  // ─── Get by autocomplete attribute (Supreme's new checkout uses these) ────
   const ac = (val) => document.querySelector(`[autocomplete="${val}"]`);
   const pl = (val) => document.querySelector(`[placeholder="${val}"]`);
   const nm = (val) => document.querySelector(`[name="${val}"]`);
@@ -103,7 +109,7 @@
     const [expMonth, expYear] = (profile.expiry || '/').split('/').map(s => s.trim());
     const fullName = `${profile.fName || ''} ${profile.lName || ''}`.trim();
 
-    // â”€â”€ Contact â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Contact ──────────────────────────────────────────────────────────────
     await focusFill(
       find('[autocomplete="email"]', '[autocomplete="shipping email"]', 'input[type="email"]', '[name="email"]', '#email'),
       profile.email
@@ -117,7 +123,7 @@
       profile.lName
     );
 
-    // â”€â”€ Address â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Address ──────────────────────────────────────────────────────────────
     await focusFill(
       find('[autocomplete="shipping address-line1"]', '[name="address1"]', '[placeholder="Address"]'),
       profile.address
@@ -139,7 +145,7 @@
       profile.phone
     );
 
-    // Country â€” only set if explicitly provided and not already correct
+    // Country — only set if explicitly provided and not already correct
     // Never derive country from state abbreviation (CA = California, not Canada)
     const countryEl = find('[autocomplete="shipping country"]', '[name="countryCode"]', '[name="country"]');
     if (countryEl) {
@@ -151,7 +157,7 @@
       await delay(300);
     }
 
-    // State â€” use full name lookup so "CA" â†’ "California", never "Canada"
+    // State — use full name lookup so "CA" → "California", never "Canada"
     const stateEl = find('[autocomplete="shipping address-level1"]', '[name="zone"]', '[name="province"]', '[name="state"]');
     if (stateEl) {
       const stateVal = STATE_MAP[profile.state?.toUpperCase()] || profile.state || '';
@@ -160,8 +166,8 @@
       await naturalDelay();
     }
 
-    // â”€â”€ Payment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // CC number/expiry/CVV are in the Shopify PCI iframe â€” handled by supreme-pci.js
+    // ── Payment ───────────────────────────────────────────────────────────────
+    // CC number/expiry/CVV are in the Shopify PCI iframe — handled by supreme-pci.js
     // Name on card can appear on the main page in some checkout layouts
     const nameOnCardEl = find('[autocomplete="cc-name"]', '[name="name_on_card"]', '[placeholder*="name on card" i]', '[placeholder*="cardholder" i]');
     if (nameOnCardEl) {
@@ -169,13 +175,13 @@
     }
   }
 
-  // â”€â”€â”€ Auto-checkout (per-profile opt-in) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Auto-checkout (per-profile opt-in) ───────────────────────────────────
   // Profile must have autoCheckout: true. After fillSupreme + a settle delay,
   // wait for the PCI iframe(s) to finish filling, then click the pay button.
   // After a successful submit, auto-disables the toggle so it doesn't fire on
   // a second checkout in the same session.
   // Detect Shopify queue / waiting-room / throttle pages. We must NOT fire
-  // auto-checkout on these â€” repeated submit attempts + failures on queue
+  // auto-checkout on these — repeated submit attempts + failures on queue
   // pages contribute to fraud-detection scoring and can get the user's IP
   // throttled by Cloudflare / Shopify.
   function isCheckoutPage() {
@@ -200,41 +206,97 @@
   async function maybeAutoSubmit(profile, profileKey) {
     if (!profile?.autoCheckout) return;
 
-    // Silent bail on queue/waiting pages â€” no overlay noise
+    // Top-frame guard — supreme-checkout.js runs in all_frames. Any nested
+    // frame that also matches the checkout URL pattern would fire its own
+    // maybeAutoSubmit; only the top window should attempt to submit.
+    if (window.top !== window) {
+      console.log('[Finest] Auto-checkout: skipped (running in sub-frame)');
+      return;
+    }
+
+    // Silent bail on queue/waiting pages — no overlay noise
     if (!isCheckoutPage()) {
       console.log('[Finest] Auto-checkout: skipped (queue / waiting room / non-checkout page)');
       return;
     }
 
     setStatusOverlay('Auto-checkout armed. Waiting for payment fields to settle...', '#c9a84c');
-    // Wait for fill to actually complete â€” poll for either the email field
-    // having a value OR the pay button becoming enabled (either signals the
-    // form is populated and Shopify has validated).
-    const fillStart = Date.now();
-    while (Date.now() - fillStart < 5000) {
+
+    const isBtnReady = (btn) => {
+      if (!btn) return false;
+      if (btn.disabled) return false;
+      if (btn.getAttribute('aria-disabled') === 'true') return false;
+      if (btn.offsetParent === null) return false;
+      return true;
+    };
+
+    const findAnyPayBtn = () =>
+      document.querySelector('#checkout-pay-button')
+      || document.querySelector('[aria-label="process payment"]')
+      || document.querySelector('[data-event-name="pay_button_inline"]');
+
+    // Some Supreme checkouts leave the pay button always-enabled and validate
+    // at click time. Button-state alone is not a reliable "ready" signal — we
+    // must also confirm that the form fields we're supposed to have filled
+    // actually contain values.
+    const isFormFilled = () => {
       const email = document.querySelector('[autocomplete="email"], [autocomplete="shipping email"], input[type="email"]');
-      const payBtn = document.querySelector('#checkout-pay-button, [aria-label="process payment"]');
-      const emailFilled = email && email.value && email.value.length > 3;
-      const btnEnabled  = payBtn && !payBtn.disabled;
-      if (emailFilled || btnEnabled) break;
-      await delay(200);
+      const fname = document.querySelector('[autocomplete="shipping given-name"], [autocomplete="given-name"], #form_firstName, [name="firstName"], [name="first_name"]');
+      const addr  = document.querySelector('[autocomplete="shipping address-line1"], [name="address1"], [placeholder="Address"]');
+      const hasVal = (el) => el && typeof el.value === 'string' && el.value.trim().length > 1;
+      return hasVal(email) && hasVal(fname) && hasVal(addr);
+    };
+
+    // STAGE 1: wait up to 20s for the pay button to exist AND be enabled
+    setStatusOverlay('Waiting for pay button to become active...', '#c9a84c');
+    const stage1Start = Date.now();
+    while (Date.now() - stage1Start < 20000) {
+      const btn = findAnyPayBtn();
+      if (isBtnReady(btn)) break;
+      await delay(250);
     }
-    // Small extra settle so the PCI iframe can also finish
-    await delay(1000);
+
+    // STAGE 2: stability check — form fields must be populated AND button
+    // must stay enabled for 2s continuously. Shopify's React validation runs
+    // async; the button can briefly flicker enabled while validation is still
+    // cycling, and on some checkouts the button is never disabled at all,
+    // so we gate on the form actually containing values.
+    setStatusOverlay('Verifying payment form is stable...', '#c9a84c');
+    const STABLE_MS = 2000;
+    let stableStart = null;
+    const stage2Start = Date.now();
+    while (Date.now() - stage2Start < 20000) {
+      const btn = findAnyPayBtn();
+      const ready = isBtnReady(btn) && isFormFilled();
+      if (ready) {
+        if (stableStart === null) stableStart = Date.now();
+        if (Date.now() - stableStart >= STABLE_MS) break;
+      } else {
+        stableStart = null; // reset — either button flickered or fields empty
+      }
+      await delay(150);
+    }
+
+    // Final gate: bail loudly if the form still isn't filled after all that
+    if (!isFormFilled()) {
+      setStatusOverlay('❌ Form fields not filled — refusing to click. Complete manually.', '#c06060');
+      console.log('[Finest] Auto-checkout: form not filled after stability wait.');
+      return;
+    }
 
     const findPayBtn = () => {
       const byId = document.querySelector('#checkout-pay-button');
-      if (byId && !byId.disabled && byId.offsetParent !== null) return { el: byId, by: '#checkout-pay-button' };
+      if (isBtnReady(byId)) return { el: byId, by: '#checkout-pay-button' };
 
       const byAria = document.querySelector('[aria-label="process payment"]');
-      if (byAria && !byAria.disabled && byAria.offsetParent !== null) return { el: byAria, by: '[aria-label="process payment"]' };
+      if (isBtnReady(byAria)) return { el: byAria, by: '[aria-label="process payment"]' };
 
       const byEvent = document.querySelector('[data-event-name="pay_button_inline"]');
-      if (byEvent && !byEvent.disabled && byEvent.offsetParent !== null) return { el: byEvent, by: '[data-event-name="pay_button_inline"]' };
+      if (isBtnReady(byEvent)) return { el: byEvent, by: '[data-event-name="pay_button_inline"]' };
 
       const textBtn = Array.from(document.querySelectorAll('button')).find(b => {
         const t = b.textContent.trim().toLowerCase();
-        return !b.disabled && b.offsetParent !== null && (
+        return isBtnReady(b) && (
           t === 'pay now' || t === 'place order' || t === 'complete order' ||
           t.includes('pay now') || t.includes('place order')
         );
@@ -252,18 +314,18 @@
     }
 
     if (!found) {
-      setStatusOverlay('âŒ Pay button not found within 10s. Click manually to complete.', '#c06060');
+      setStatusOverlay('❌ Pay button not found within 10s. Click manually to complete.', '#c06060');
       console.log('[Finest] Auto-checkout: pay button not found within 10s.');
       return;
     }
 
-    setStatusOverlay(`Pay button found via ${found.by}. Clicking in 200ms...`, '#e8b04c');
-    await delay(150 + Math.random() * 200);
+    setStatusOverlay(`Pay button ready (${found.by}). Clicking in 300ms...`, '#e8b04c');
+    await delay(200 + Math.random() * 250);
 
     // Sanity: verify button is still in DOM and clickable right before clicking
     const stillValid = document.contains(found.el) && !found.el.disabled;
     if (!stillValid) {
-      setStatusOverlay('âš  Button became invalid before click. Try manually.', '#c06060');
+      setStatusOverlay('⚠ Button became invalid before click. Try manually.', '#c06060');
       return;
     }
 
@@ -271,7 +333,7 @@
     // synthetic event system picks it up, then call .click(), then fall back to
     // submitting the parent form directly if React handlers swallowed the click.
     fireRealClick(found.el);
-    setStatusOverlay('âœ… Pay button clicked. Watching for response...', '#7ec98a');
+    setStatusOverlay('✅ Pay button clicked. Watching for response...', '#7ec98a');
     console.log('[Finest] Auto-checkout: pay button clicked via', found.by);
 
     await disableAutoCheckoutAfterPurchase(profileKey);
@@ -279,7 +341,7 @@
   }
 
   // Multi-method click: maximizes the chance Shopify's React handlers fire.
-  // Tries DOM events, native .click(), form.requestSubmit, and finally â€”
+  // Tries DOM events, native .click(), form.requestSubmit, and finally —
   // injects a script into the page's MAIN world to call React's onClick directly.
   function fireRealClick(el) {
     try {
@@ -311,6 +373,16 @@
       if (form && typeof form.requestSubmit === 'function') form.requestSubmit(el);
     } catch {}
 
+    // Focus + Enter key (many checkouts submit on Enter when the pay button
+    // or an input inside the form has focus)
+    try {
+      el.focus();
+      const keyOpts = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true };
+      el.dispatchEvent(new KeyboardEvent('keydown', keyOpts));
+      el.dispatchEvent(new KeyboardEvent('keypress', keyOpts));
+      el.dispatchEvent(new KeyboardEvent('keyup', keyOpts));
+    } catch {}
+
     // NUCLEAR FALLBACK: inject a script that runs in the page's main world.
     // From there it can find React's fiber properties and call onClick directly,
     // bypassing any isTrusted check in the synthetic event path.
@@ -320,30 +392,74 @@
         const btn = document.querySelector('#checkout-pay-button')
           || document.querySelector('[aria-label="process payment"]')
           || document.querySelector('[data-event-name="pay_button_inline"]');
-        if (!btn) return;
-        // Find React's internal props key â€” it changes per React version
+        if (!btn) { console.warn('[Finest:main] pay button not found in main world'); return; }
+
+        // Build a real MouseEvent to pass through — some Shopify handlers
+        // expect event.nativeEvent to exist.
+        const rect = btn.getBoundingClientRect();
+        const mkNative = () => new MouseEvent('click', {
+          bubbles: true, cancelable: true, view: window,
+          clientX: rect.left + rect.width/2, clientY: rect.top + rect.height/2,
+          button: 0, buttons: 0,
+        });
+        const mkSynth = (type, target) => {
+          const nv = mkNative();
+          return {
+            type, target, currentTarget: target, nativeEvent: nv,
+            bubbles: true, cancelable: true, defaultPrevented: false,
+            preventDefault: () => { try { nv.preventDefault(); } catch {} },
+            stopPropagation: () => { try { nv.stopPropagation(); } catch {} },
+            persist: () => {}, isTrusted: false,
+          };
+        };
+
+        const HANDLERS_BTN = ['onClick', 'onClickCapture', 'onMouseDown', 'onPointerDown', 'onTap'];
+        const HANDLERS_FORM = ['onSubmit', 'onSubmitCapture'];
+
         const propsKey = Object.keys(btn).find(k => k.startsWith('__reactProps'));
         const fiberKey = Object.keys(btn).find(k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'));
+
+        let fired = 0;
+
         if (propsKey && btn[propsKey]) {
-          const p = btn[propsKey];
-          // Try the common handler names
-          const handler = p.onClick || p.onTap || p.onSubmit;
-          if (typeof handler === 'function') {
-            try { handler({ preventDefault: () => {}, stopPropagation: () => {}, currentTarget: btn, target: btn, type: 'click' }); } catch (e) { console.warn('[Finest:main] handler threw:', e); }
+          for (const name of HANDLERS_BTN) {
+            const h = btn[propsKey][name];
+            if (typeof h === 'function') {
+              try { h(mkSynth('click', btn)); fired++; console.log('[Finest:main] fired', name); } catch (e) { console.warn('[Finest:main]', name, 'threw:', e); }
+            }
           }
         }
-        // Also walk up the fiber tree for parent onSubmit (form-level handler)
+
+        // Walk up the fiber tree for parent form/button handlers. React
+        // component trees are often 20-40 deep on Shopify checkouts.
         if (fiberKey && btn[fiberKey]) {
           let f = btn[fiberKey].return;
           let hops = 0;
-          while (f && hops < 8) {
+          while (f && hops < 40) {
             const ps = f.memoizedProps || f.pendingProps;
-            if (ps && typeof ps.onSubmit === 'function') {
-              try { ps.onSubmit({ preventDefault: () => {}, stopPropagation: () => {}, currentTarget: f.stateNode, target: btn, type: 'submit' }); break; } catch (e) {}
+            if (ps) {
+              for (const name of HANDLERS_FORM) {
+                if (typeof ps[name] === 'function') {
+                  try { ps[name](mkSynth('submit', f.stateNode || btn)); fired++; console.log('[Finest:main] fired parent', name, 'at hop', hops); } catch (e) { console.warn('[Finest:main] parent', name, 'threw:', e); }
+                }
+              }
+              for (const name of HANDLERS_BTN) {
+                if (typeof ps[name] === 'function' && f.stateNode !== btn) {
+                  try { ps[name](mkSynth('click', f.stateNode || btn)); fired++; console.log('[Finest:main] fired parent', name, 'at hop', hops); } catch (e) {}
+                }
+              }
             }
             f = f.return; hops++;
           }
         }
+
+        // Last resort: call the native HTMLButtonElement.click prototype
+        try {
+          HTMLButtonElement.prototype.click.call(btn);
+          console.log('[Finest:main] prototype click invoked');
+        } catch (e) { console.warn('[Finest:main] prototype click failed:', e); }
+
+        console.log('[Finest:main] total handlers fired:', fired);
       })();`;
       (document.head || document.documentElement).appendChild(s);
       s.remove();
@@ -371,7 +487,7 @@
     const c = color || '#c9a84c';
     div.style.border = '1px solid ' + c;
     div.style.color = c;
-    div.innerHTML = `<div style="font-weight:700;margin-bottom:4px">âš¡ Finest Auto-Checkout</div><div style="color:#c8bfaa;font-size:11px">${message}</div>`;
+    div.innerHTML = `<div style="font-weight:700;margin-bottom:4px">⚡ Finest Auto-Checkout</div><div style="color:#c8bfaa;font-size:11px">${message}</div>`;
   }
 
   async function disableAutoCheckoutAfterPurchase(profileKey) {
@@ -427,19 +543,19 @@
     div.style.border = '1px solid #7ec98a';
     div.style.color = '#7ec98a';
     div.innerHTML = `
-      <div style="font-weight:700;margin-bottom:6px">âœ… Finest â€” Purchase Submitted</div>
+      <div style="font-weight:700;margin-bottom:6px">✅ Finest — Purchase Submitted</div>
       <div style="color:#c8bfaa;font-size:11px;margin-bottom:8px">
         Auto-checkout has been turned <strong style="color:#7ec98a">OFF</strong> on this profile so you don't accidentally double-buy.
       </div>
       <div style="color:#7a6f56;font-size:10px">
-        Re-enable from Dashboard â†’ Profile â†’ Auto-Checkout if you want it on for another order.
+        Re-enable from Dashboard → Profile → Auto-Checkout if you want it on for another order.
       </div>
     `;
     // Auto-dismiss after 30s
     setTimeout(() => { if (div?.parentNode) div.remove(); }, 30000);
   }
 
-  // â”€â”€â”€ Run â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Run ──────────────────────────────────────────────────────────────────
   async function isLicensed() {
     const d = await chrome.storage.local.get(['licenseKey', 'licenseValid']);
     return !!(d.licenseKey && d.licenseValid);
@@ -452,8 +568,17 @@
     const profile = data.profiles?.[data.activeProfile] ?? null;
     if (!profile) return;
 
+    // Queue / throttle / waiting-room gate — don't even try to fill until
+    // we're on the real checkout page. Filling on the queue page is wasteful
+    // and can leave partial state that confuses the fill logic on transition.
+    // The SPA observer will re-invoke run() once we transition off the queue.
+    if (!isCheckoutPage()) {
+      console.log('[Finest] Fill: skipped (queue / waiting room / non-checkout page)');
+      return;
+    }
+
     // Wait for a LATE-rendering field (address or firstName). Supreme's React
-    // checkout renders progressively â€” email appears first, then the rest of
+    // checkout renders progressively — email appears first, then the rest of
     // the form. If we only wait for email, we start filling before name/address
     // exist and silently skip them.
     await waitFor(
@@ -464,12 +589,12 @@
     await delay(400);
     await fillSupreme(profile);
 
-    // Verify address actually got filled â€” if not, wait and retry once
+    // Verify address actually got filled — if not, wait and retry once
     const addressEl = find(
       '[autocomplete="shipping address-line1"]', '[name="address1"]', '[placeholder="Address"]'
     );
     if (addressEl && !addressEl.value && profile.address) {
-      console.log('[Finest] Address empty after first pass â€” retrying in 800ms');
+      console.log('[Finest] Address empty after first pass — retrying in 800ms');
       await delay(800);
       await fillSupreme(profile);
     }
@@ -478,6 +603,64 @@
   }
 
   run();
+
+  // SPA transition watcher: Shopify's queue → checkout on Supreme is often an
+  // in-page navigation that does NOT re-inject content scripts. Watch for the
+  // checkout form to appear (or URL to change to a non-throttle checkout URL)
+  // and re-run fill + auto-checkout when it does.
+  let lastUrl = location.href;
+  let lastRunAt = 0; // 0 so first re-run isn't debounced
+  let filling = false;
+  const FORM_SELECTOR =
+    '#form_firstName, [name="form_firstName"], [autocomplete="shipping address-line1"], [name="address1"]';
+
+  async function maybeReRun(reason) {
+    if (filling) { console.log('[Finest] maybeReRun bail (filling):', reason); return; }
+    if (Date.now() - lastRunAt < 1500) { console.log('[Finest] maybeReRun bail (debounce):', reason); return; }
+    if (window.top !== window) { console.log('[Finest] maybeReRun bail (sub-frame):', reason); return; }
+    const email = document.querySelector('[autocomplete="email"], [autocomplete="shipping email"], input[type="email"]');
+    const emailFilled = email && typeof email.value === 'string' && email.value.trim().length > 1;
+    if (emailFilled) { console.log('[Finest] maybeReRun bail (email already filled):', reason); return; }
+    // Do NOT bail on missing form here — run() has its own waitFor and will
+    // wait for the form to appear. Bailing here misses the queue→checkout
+    // transition where URL flips before the new form renders.
+    filling = true;
+    lastRunAt = Date.now();
+    console.log('[Finest] SPA re-run triggered:', reason);
+    try { await run(); } catch (e) { console.warn('[Finest] SPA re-run threw:', e); }
+    finally { filling = false; console.log('[Finest] SPA re-run complete:', reason); }
+  }
+
+  // Observer watches documentElement (survives body replacement) for URL/form
+  // changes. Additionally poll URL every 500ms as a fallback in case Shopify
+  // updates the URL without triggering an observable mutation.
+  const spaObserver = new MutationObserver(() => {
+    if (location.href !== lastUrl) {
+      console.log('[Finest] URL changed (observer):', lastUrl, '->', location.href);
+      lastUrl = location.href;
+      maybeReRun('url-change-observer');
+      return;
+    }
+    if (document.querySelector(FORM_SELECTOR)) {
+      maybeReRun('form-appeared');
+    }
+  });
+  const startObserver = () => {
+    const root = document.documentElement;
+    if (!root) { setTimeout(startObserver, 100); return; }
+    spaObserver.observe(root, { childList: true, subtree: true });
+  };
+  startObserver();
+
+  // Fallback URL poll — catches SPA nav that doesn't mutate the DOM tree
+  // rooted at documentElement in a way the observer can detect.
+  setInterval(() => {
+    if (location.href !== lastUrl) {
+      console.log('[Finest] URL changed (poll):', lastUrl, '->', location.href);
+      lastUrl = location.href;
+      maybeReRun('url-change-poll');
+    }
+  }, 500);
 
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.action === 'FILL_FORM' && msg.profile) {
@@ -492,3 +675,4 @@
   });
 })();
 
+})(); // end auto-update wrapper
