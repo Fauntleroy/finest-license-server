@@ -457,10 +457,29 @@
     if (!data.settings?.autoFill) return;
     const profile = data.profiles?.[data.activeProfile] ?? null;
     if (!profile) return;
-    // Wait for email field then small settle delay before filling
-    await waitFor('[autocomplete="email"], [autocomplete="shipping email"], input[type="email"], [name="email"], #email');
-    await delay(300);
+
+    // Wait for a LATE-rendering field (address or firstName). Supreme's React
+    // checkout renders progressively — email appears first, then the rest of
+    // the form. If we only wait for email, we start filling before name/address
+    // exist and silently skip them.
+    await waitFor(
+      '[autocomplete="shipping address-line1"], [name="address1"], #form_firstName, ' +
+      '[autocomplete="given-name"], [autocomplete="shipping given-name"], [name="firstName"], [name="first_name"]',
+      15000
+    );
+    await delay(400);
     await fillSupreme(profile);
+
+    // Verify address actually got filled — if not, wait and retry once
+    const addressEl = find(
+      '[autocomplete="shipping address-line1"]', '[name="address1"]', '[placeholder="Address"]'
+    );
+    if (addressEl && !addressEl.value && profile.address) {
+      console.log('[Finest] Address empty after first pass — retrying in 800ms');
+      await delay(800);
+      await fillSupreme(profile);
+    }
+
     await maybeAutoSubmit(profile, data.activeProfile);
   }
 
