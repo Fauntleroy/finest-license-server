@@ -207,28 +207,47 @@ async function sendKeyEmail(toEmail, key, fromOverride = null) {
 // (on startup, on cron, or manually from the admin panel).
 async function sendKeyEmailTracked(toEmail, key) {
   const keysBefore = loadKeys();
-  const attemptsSoFar = keysBefore[key]?.emailAttempts || 0;
-  // Once the primary FROM has failed enough times, switch to the fallback
-  // sender so the buyer actually gets their key (even if it hits spam).
-  const useFallback = EMAIL_FALLBACK_FROM
-    && EMAIL_FALLBACK_FROM !== FROM_EMAIL
-    && attemptsSoFar >= EMAIL_FALLBACK_AFTER_ATTEMPTS;
-  const fromUsed = useFallback ? EMAIL_FALLBACK_FROM : FROM_EMAIL;
-  const ok = await sendKeyEmail(toEmail, key, useFallback ? EMAIL_FALLBACK_FROM : null);
+  const primaryFailures = keysBefore[key]?.primaryFailures || 0;
+
+  // Always try the primary first — if its config starts working again (DNS
+  // propagates, limits reset) buyers should immediately go back to the
+  // branded sender instead of staying stuck on the fallback.
+  let ok = await sendKeyEmail(toEmail, key, null);
+  let fromUsed = FROM_EMAIL;
+  let newPrimaryFailures = primaryFailures;
+
+  if (ok) {
+    newPrimaryFailures = 0; // primary healed — reset the counter
+  } else {
+    newPrimaryFailures = primaryFailures + 1;
+    // Primary failed on this attempt. If primary has now failed enough times
+    // overall, try the fallback sender once on this same attempt so the buyer
+    // actually gets their key.
+    const canFallback = EMAIL_FALLBACK_FROM
+      && EMAIL_FALLBACK_FROM !== FROM_EMAIL
+      && newPrimaryFailures >= EMAIL_FALLBACK_AFTER_ATTEMPTS;
+    if (canFallback) {
+      console.log(`[Email] Primary failed ${newPrimaryFailures}x for ${toEmail} — trying fallback`);
+      const okFallback = await sendKeyEmail(toEmail, key, EMAIL_FALLBACK_FROM);
+      if (okFallback) {
+        ok = true;
+        fromUsed = EMAIL_FALLBACK_FROM;
+      }
+    }
+  }
+
   const keys = loadKeys();
   if (keys[key]) {
     keys[key].emailSent           = ok;
     keys[key].emailLastAttempt    = new Date().toISOString();
     keys[key].emailAttempts       = (keys[key].emailAttempts || 0) + 1;
     keys[key].emailLastFrom       = fromUsed;
+    keys[key].primaryFailures     = newPrimaryFailures;
     if (ok) {
       keys[key].emailSentAt   = new Date().toISOString();
       keys[key].emailSentFrom = fromUsed;
     }
     saveKeys(keys);
-  }
-  if (useFallback) {
-    console.log(`[Email] Used fallback sender for ${toEmail} after ${attemptsSoFar} primary failures`);
   }
   return ok;
 }
