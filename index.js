@@ -19,6 +19,12 @@ const DISCORD_SERVER_ID     = process.env.DISCORD_SERVER_ID    || '7562116945475
 const EXTENSION_DOWNLOAD_URL= process.env.EXTENSION_DOWNLOAD_URL || '';
 const RESEND_API_KEY        = process.env.RESEND_API_KEY         || '';
 const FROM_EMAIL            = process.env.FROM_EMAIL             || 'Finest Checkouts <onboarding@resend.dev>';
+// Fallback sender used when the primary FROM_EMAIL fails this many times.
+// Lets buyers get their key via Resend's shared sender (hits spam more often
+// but beats never arriving) once a custom-domain config problem is clearly
+// stuck.
+const EMAIL_FALLBACK_FROM           = process.env.EMAIL_FALLBACK_FROM           || 'Finest Checkouts <onboarding@resend.dev>';
+const EMAIL_FALLBACK_AFTER_ATTEMPTS = parseInt(process.env.EMAIL_FALLBACK_AFTER_ATTEMPTS || '3', 10);
 const WHOP_API_KEY          = process.env.WHOP_API_KEY           || '';
 
 // Roles that grant access (role names, lowercase — edit via DISCORD_QUALIFYING_ROLES env var)
@@ -147,8 +153,11 @@ async function exchangeDiscordCode(code) {
 
 // ── Email via Resend ──────────────────────────────────────────────────────────
 // Returns true on success, false on failure (so callers can mark the key for retry).
-async function sendKeyEmail(toEmail, key) {
+// `fromOverride` lets the retry layer swap in a fallback sender when the primary
+// has failed repeatedly (e.g. unverified-domain errors from a DNS move).
+async function sendKeyEmail(toEmail, key, fromOverride = null) {
   if (!RESEND_API_KEY) { console.warn('[Email] RESEND_API_KEY not set — skipping'); return false; }
+  const fromAddress = fromOverride || FROM_EMAIL;
 
   const downloadSection = EXTENSION_DOWNLOAD_URL
     ? `<p style="margin:16px 0"><a href="${EXTENSION_DOWNLOAD_URL}" style="background:#c9a84c;color:#080808;padding:12px 24px;border-radius:5px;text-decoration:none;font-weight:700;font-family:monospace">Download Extension</a></p>
@@ -178,14 +187,14 @@ async function sendKeyEmail(toEmail, key) {
     const res = await fetch('https://api.resend.com/emails', {
       method:  'POST',
       headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: FROM_EMAIL, to: [toEmail], subject: 'Your Finest Checkouts License Key', html }),
+      body: JSON.stringify({ from: fromAddress, to: [toEmail], subject: 'Your Finest Checkouts License Key', html }),
     });
     if (!res.ok) {
       const err = await res.text();
-      console.error('[Email] Resend error:', err);
+      console.error(`[Email] Resend error (from=${fromAddress}):`, err);
       return false;
     }
-    console.log(`[Email] Key sent to ${toEmail}`);
+    console.log(`[Email] Key sent to ${toEmail} (from=${fromAddress})`);
     return true;
   } catch (err) {
     console.error('[Email] Failed to send:', err.message);
@@ -197,14 +206,29 @@ async function sendKeyEmail(toEmail, key) {
 // Marks email status on the key record so failed emails can be retried later
 // (on startup, on cron, or manually from the admin panel).
 async function sendKeyEmailTracked(toEmail, key) {
-  const ok = await sendKeyEmail(toEmail, key);
+  const keysBefore = loadKeys();
+  const attemptsSoFar = keysBefore[key]?.emailAttempts || 0;
+  // Once the primary FROM has failed enough times, switch to the fallback
+  // sender so the buyer actually gets their key (even if it hits spam).
+  const useFallback = EMAIL_FALLBACK_FROM
+    && EMAIL_FALLBACK_FROM !== FROM_EMAIL
+    && attemptsSoFar >= EMAIL_FALLBACK_AFTER_ATTEMPTS;
+  const fromUsed = useFallback ? EMAIL_FALLBACK_FROM : FROM_EMAIL;
+  const ok = await sendKeyEmail(toEmail, key, useFallback ? EMAIL_FALLBACK_FROM : null);
   const keys = loadKeys();
   if (keys[key]) {
     keys[key].emailSent           = ok;
     keys[key].emailLastAttempt    = new Date().toISOString();
     keys[key].emailAttempts       = (keys[key].emailAttempts || 0) + 1;
-    if (ok) keys[key].emailSentAt = new Date().toISOString();
+    keys[key].emailLastFrom       = fromUsed;
+    if (ok) {
+      keys[key].emailSentAt   = new Date().toISOString();
+      keys[key].emailSentFrom = fromUsed;
+    }
     saveKeys(keys);
+  }
+  if (useFallback) {
+    console.log(`[Email] Used fallback sender for ${toEmail} after ${attemptsSoFar} primary failures`);
   }
   return ok;
 }
