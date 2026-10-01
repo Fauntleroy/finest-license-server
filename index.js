@@ -20,10 +20,10 @@ const EXTENSION_DOWNLOAD_URL= process.env.EXTENSION_DOWNLOAD_URL || '';
 const RESEND_API_KEY        = process.env.RESEND_API_KEY         || '';
 const FROM_EMAIL            = process.env.FROM_EMAIL             || 'Finest Checkouts <onboarding@resend.dev>';
 // Fallback sender used when the primary FROM_EMAIL fails this many times.
-// Lets buyers get their key via Resend's shared sender (hits spam more often
-// but beats never arriving) once a custom-domain config problem is clearly
-// stuck.
-const EMAIL_FALLBACK_FROM           = process.env.EMAIL_FALLBACK_FROM           || 'Finest Checkouts <onboarding@resend.dev>';
+// Default is empty = disabled. Resend's shared `onboarding@resend.dev` can
+// only email the account owner, so it is not a viable fallback for real
+// buyers — only set this if you have a SECOND verified sender you control.
+const EMAIL_FALLBACK_FROM           = process.env.EMAIL_FALLBACK_FROM           || '';
 const EMAIL_FALLBACK_AFTER_ATTEMPTS = parseInt(process.env.EMAIL_FALLBACK_AFTER_ATTEMPTS || '3', 10);
 const WHOP_API_KEY          = process.env.WHOP_API_KEY           || '';
 
