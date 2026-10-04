@@ -43,6 +43,64 @@ function saveKeys(keys) {
   fs.writeFileSync(KEYS_FILE, JSON.stringify(keys, null, 2));
 }
 
+// ── Purchase feed (anonymous checkout tracking) ───────────────────────────────
+// Extension posts {site, productName, productImage, color, size, price,
+// currency, region} to /track/purchase on confirmed checkout. Server appends
+// to purchases.json and (optionally) forwards to a Discord webhook. No
+// identity ever stored: no email, no key, no IP.
+const PURCHASES_FILE = process.env.PURCHASES_FILE || path.join(__dirname, 'purchases.json');
+const DISCORD_PURCHASE_WEBHOOK_URL = process.env.DISCORD_PURCHASE_WEBHOOK_URL || '';
+const PURCHASE_FEED_MAX = parseInt(process.env.PURCHASE_FEED_MAX || '500', 10);
+
+function loadPurchases() {
+  if (!fs.existsSync(PURCHASES_FILE)) fs.writeFileSync(PURCHASES_FILE, '{"entries":[]}');
+  try { return JSON.parse(fs.readFileSync(PURCHASES_FILE, 'utf8')); }
+  catch { return { entries: [] }; }
+}
+
+function savePurchases(data) {
+  fs.writeFileSync(PURCHASES_FILE, JSON.stringify(data, null, 2));
+}
+
+function appendPurchase(entry) {
+  const data = loadPurchases();
+  data.entries.unshift(entry); // newest first
+  if (data.entries.length > PURCHASE_FEED_MAX) {
+    data.entries.length = PURCHASE_FEED_MAX;
+  }
+  savePurchases(data);
+}
+
+async function postPurchaseToDiscord(entry) {
+  if (!DISCORD_PURCHASE_WEBHOOK_URL) return;
+  const siteLabel = entry.site ? entry.site.charAt(0).toUpperCase() + entry.site.slice(1) : 'Unknown';
+  const regionLabel = entry.region ? ` ${entry.region.toUpperCase()}` : '';
+  const price = (entry.price != null && entry.price !== '')
+    ? `${entry.currency || '$'}${entry.price}`
+    : null;
+  const descParts = [];
+  if (entry.color) descParts.push(entry.color);
+  if (entry.size) descParts.push(entry.size);
+  if (price) descParts.push(price);
+  const embed = {
+    title: entry.productName || 'Checkout',
+    description: descParts.join(' · ') || null,
+    color: 0xc9a84c,
+    footer: { text: `${siteLabel}${regionLabel} · Finest Checkouts` },
+    timestamp: entry.timestamp || new Date().toISOString(),
+  };
+  if (entry.productImage) embed.thumbnail = { url: entry.productImage };
+  try {
+    await fetch(DISCORD_PURCHASE_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'Finest Checkouts', embeds: [embed] }),
+    });
+  } catch (e) {
+    console.warn('[Discord] Purchase webhook failed:', e.message);
+  }
+}
+
 function generateKey() {
   const seg = () => crypto.randomBytes(2).toString('hex').toUpperCase();
   return `FINEST-${seg()}-${seg()}-${seg()}`;
@@ -1737,12 +1795,269 @@ app.post('/admin/assign-roles', async (req, res) => {
   return res.json({ assigned, skipped, failed });
 });
 
+// ═════════════════════════════════════════════════════════════════════════════
+// PURCHASE FEED — anonymous checkout tracking + public widget
+// ═════════════════════════════════════════════════════════════════════════════
+
+// POST /track/purchase — called by the extension on confirmed checkout.
+// Requires a valid active license key in X-License-Key header (so random
+// websites can't spam the feed) but the key itself is NEVER stored on the
+// purchase record. Payload: {site, productName, productImage, color, size,
+// price, currency, region}.
+app.post('/track/purchase', async (req, res) => {
+  const headerKey = (req.header('x-license-key') || '').toUpperCase();
+  if (!headerKey) return res.status(401).json({ error: 'Missing license key' });
+  const keys = loadKeys();
+  const rec = keys[headerKey];
+  if (!rec || rec.status !== 'active') {
+    return res.status(403).json({ error: 'Invalid or inactive license' });
+  }
+
+  const b = req.body || {};
+  const str = (v, max = 120) => typeof v === 'string' ? v.trim().slice(0, max) : '';
+  const url = (v) => {
+    if (typeof v !== 'string') return '';
+    const s = v.trim().slice(0, 500);
+    if (!/^https?:\/\//i.test(s)) return '';
+    return s;
+  };
+  const num = (v) => {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
+  };
+
+  const entry = {
+    id:           'p_' + crypto.randomBytes(6).toString('hex'),
+    site:         str(b.site, 40).toLowerCase(),
+    region:       str(b.region, 10).toLowerCase(),
+    productName:  str(b.productName, 160),
+    productImage: url(b.productImage),
+    color:        str(b.color, 80),
+    size:         str(b.size, 40),
+    price:        num(b.price),
+    currency:     str(b.currency, 6) || 'USD',
+    timestamp:    new Date().toISOString(),
+  };
+  if (!entry.productName && !entry.site) {
+    return res.status(400).json({ error: 'productName or site required' });
+  }
+
+  appendPurchase(entry);
+  postPurchaseToDiscord(entry).catch(() => {});
+  return res.json({ ok: true, id: entry.id });
+});
+
+// GET /purchases/recent?limit=N — public, anonymous JSON for the feed widget.
+app.get('/purchases/recent', (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit || '20', 10) || 20, 100);
+  const data = loadPurchases();
+  res.set('Access-Control-Allow-Origin', '*');
+  res.json({ entries: data.entries.slice(0, limit) });
+});
+
+// GET /purchases/top?window=7d&limit=5 — ranked top items by checkout count.
+app.get('/purchases/top', (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit || '5', 10) || 5, 20);
+  const windowStr = String(req.query.window || '7d');
+  const m = /^(\d+)(h|d)$/.exec(windowStr);
+  const windowMs = m
+    ? parseInt(m[1], 10) * (m[2] === 'h' ? 3_600_000 : 86_400_000)
+    : 7 * 86_400_000;
+  const cutoff = Date.now() - windowMs;
+
+  const data = loadPurchases();
+  const counts = new Map();
+  for (const e of data.entries) {
+    if (new Date(e.timestamp).getTime() < cutoff) continue;
+    const key = `${e.site}|${e.productName}`.toLowerCase();
+    const cur = counts.get(key) || { site: e.site, productName: e.productName, productImage: e.productImage, count: 0 };
+    cur.count++;
+    if (!cur.productImage && e.productImage) cur.productImage = e.productImage;
+    counts.set(key, cur);
+  }
+  const top = [...counts.values()].sort((a, b) => b.count - a.count).slice(0, limit);
+  res.set('Access-Control-Allow-Origin', '*');
+  res.json({ window: windowStr, top });
+});
+
+// GET /feed-widget — iframeable HTML page for embedding on fauntleroysfinest.com
+// Dark theme matches the main site. Shows a cycling list of recent anonymous
+// checkouts. Fetches /purchases/recent on an interval so new entries show
+// up without reloading the parent page.
+app.get('/feed-widget', (req, res) => {
+  // Allow being framed by the Squarespace site (and anywhere else — this is
+  // a public widget).
+  res.removeHeader('X-Frame-Options');
+  res.set('Content-Security-Policy', "frame-ancestors *;");
+  res.set('Cache-Control', 'no-store');
+  res.type('html').send(feedWidgetHTML());
+});
+
+function feedWidgetHTML() {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Finest Checkouts — Live Feed</title>
+<style>
+  :root {
+    --bg:#0a0a0a; --panel:#131313; --border:#242017;
+    --gold:#c9a84c; --gold-dim:#7a5e1e; --text:#e8dfc8;
+    --sub:#8a8171; --muted:#4a4335;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; padding:0; background:transparent; color:var(--text); font-family: 'Courier New', ui-monospace, monospace; }
+  .wrap {
+    display:flex; flex-direction:column; height:100vh; padding:14px 14px 12px;
+    background:var(--bg); border:1px solid var(--border); border-radius:10px;
+    overflow:hidden;
+  }
+  .head {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border);
+  }
+  .title {
+    color:var(--gold); font-weight:700; font-size:11px; letter-spacing:0.15em; text-transform:uppercase;
+    display:flex; align-items:center; gap:6px;
+  }
+  .pulse {
+    width:7px; height:7px; border-radius:50%; background:#7ec98a;
+    box-shadow:0 0 8px #7ec98a; animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .count { color:var(--sub); font-size:10px; letter-spacing:0.08em; }
+  .list { flex:1; overflow:hidden; position:relative; }
+  .track { position:absolute; inset:0; }
+  .row {
+    display:flex; align-items:center; gap:10px; padding:9px 2px;
+    border-bottom:1px dashed var(--border); animation: slideIn 0.5s ease-out;
+  }
+  @keyframes slideIn { from{opacity:0; transform:translateY(-6px)} to{opacity:1; transform:none} }
+  .row:last-child { border-bottom:none; }
+  .thumb {
+    width:36px; height:36px; flex:none; border-radius:4px; background:#1a1710;
+    background-size:cover; background-position:center;
+    border:1px solid var(--border);
+  }
+  .meta { flex:1; min-width:0; }
+  .product { color:var(--text); font-size:12px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sub { color:var(--sub); font-size:10px; margin-top:2px; letter-spacing:0.03em; }
+  .time { color:var(--gold-dim); font-size:9px; flex:none; letter-spacing:0.05em; text-transform:uppercase; }
+  .empty { text-align:center; color:var(--muted); font-size:11px; padding:24px 10px; letter-spacing:0.05em; }
+  .foot {
+    margin-top:8px; padding-top:7px; border-top:1px solid var(--border);
+    display:flex; justify-content:space-between; align-items:center;
+    color:var(--muted); font-size:9px; letter-spacing:0.1em; text-transform:uppercase;
+  }
+  .foot a { color:var(--gold-dim); text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="title"><span class="pulse"></span>Live Checkouts</div>
+    <div class="count" id="count"></div>
+  </div>
+  <div class="list"><div class="track" id="track"><div class="empty">Waiting for the next cop…</div></div></div>
+  <div class="foot">
+    <span>Finest Checkouts</span>
+    <span id="updated"></span>
+  </div>
+</div>
+<script>
+  const WINDOW_SIZE = 4;         // rows visible at once
+  const CYCLE_MS   = 4000;       // rotate every 4s if feed is longer than window
+  const FETCH_MS   = 15000;      // refresh from server every 15s
+  const MAX_FETCH  = 25;
+  let entries = [];
+  let cursor  = 0;
+
+  function timeAgo(iso) {
+    const d = Date.now() - new Date(iso).getTime();
+    const s = Math.floor(d/1000);
+    if (s < 60) return s + 's ago';
+    const m = Math.floor(s/60);
+    if (m < 60) return m + 'm ago';
+    const h = Math.floor(m/60);
+    if (h < 24) return h + 'h ago';
+    return Math.floor(h/24) + 'd ago';
+  }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function renderRow(e) {
+    const parts = [];
+    if (e.color) parts.push(esc(e.color));
+    if (e.size) parts.push(esc(e.size));
+    if (e.price != null) parts.push((e.currency||'$') + e.price);
+    const site = e.site ? e.site.charAt(0).toUpperCase() + e.site.slice(1) : '';
+    const region = e.region ? ' ' + e.region.toUpperCase() : '';
+    const thumbStyle = e.productImage ? 'background-image:url("' + esc(e.productImage) + '")' : '';
+    return '<div class="row">' +
+      '<div class="thumb" style="' + thumbStyle + '"></div>' +
+      '<div class="meta">' +
+        '<div class="product">' + esc(e.productName || 'Unknown') + '</div>' +
+        '<div class="sub">' + parts.join(' · ') + (parts.length ? ' · ' : '') + esc(site + region) + '</div>' +
+      '</div>' +
+      '<div class="time">' + timeAgo(e.timestamp) + '</div>' +
+    '</div>';
+  }
+  function render() {
+    const track = document.getElementById('track');
+    const countEl = document.getElementById('count');
+    const updatedEl = document.getElementById('updated');
+    if (!entries.length) {
+      track.innerHTML = '<div class="empty">Waiting for the next cop…</div>';
+      countEl.textContent = '';
+      updatedEl.textContent = '';
+      return;
+    }
+    countEl.textContent = entries.length + ' tracked';
+    updatedEl.textContent = 'updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+
+    // Cycle: pick WINDOW_SIZE starting at cursor, wrap around.
+    const show = [];
+    const n = Math.min(WINDOW_SIZE, entries.length);
+    for (let i = 0; i < n; i++) show.push(entries[(cursor + i) % entries.length]);
+    track.innerHTML = show.map(renderRow).join('');
+  }
+
+  async function fetchEntries() {
+    try {
+      const r = await fetch('/purchases/recent?limit=' + MAX_FETCH, { cache: 'no-store' });
+      const data = await r.json();
+      entries = data.entries || [];
+      render();
+    } catch (e) { /* keep showing last state */ }
+  }
+
+  setInterval(() => {
+    if (entries.length > WINDOW_SIZE) {
+      cursor = (cursor + 1) % entries.length;
+      render();
+    } else {
+      // only update timestamps when not cycling
+      render();
+    }
+  }, CYCLE_MS);
+  setInterval(fetchEntries, FETCH_MS);
+  fetchEntries();
+</script>
+</body>
+</html>`;
+}
+
+// GET /admin/purchases — view feed JSON with the full stored list.
+app.get('/admin/purchases', (req, res) => {
+  if (req.query.secret !== process.env.ADMIN_SECRET) return res.status(403).send('Forbidden');
+  res.json(loadPurchases());
+});
+
 // ─────────────────────────────────────────────
 // GET /version
 // ─────────────────────────────────────────────
 app.get('/version', (req, res) => {
   res.json({
-    version:     process.env.CURRENT_VERSION || '2.2.5',
+    version:     process.env.CURRENT_VERSION || '2.2.6',
     downloadUrl: EXTENSION_DOWNLOAD_URL || null,
     scripts: {
       fnl:             `${SERVER_URL}/scripts/fnl.js`,
